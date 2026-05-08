@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() 
+        && request.resource.data.keys().hasAll(['name', 'email', 'company', 'createdAt'])
+        && request.resource.data.createdAt == request.time;
+      allow update: if isSignedIn() 
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isSignedIn();
+    }
+
+    match /migrations/{migrationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isSignedIn()
+        && request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isSignedIn();
+    }
+
+    match /ai_interactions/{interactionId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.timestamp == request.time;
+    }
+  }
+}

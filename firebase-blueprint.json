@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "Client": {
+      "title": "Client",
+      "description": "Represents a client of MigraFlow",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "company": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "company", "createdAt"]
+    },
+    "Migration": {
+      "title": "Migration",
+      "description": "Represents a migration project",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pendente", "em_progresso", "concluida", "atrasada"] },
+        "description": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "reportUrl": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "disks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string" },
+              "status": { "type": "string", "enum": ["Realizado", "Realizando", "Pendente"] },
+              "pastasRealizadas": { "type": "number" },
+              "estudos": { "type": "number" },
+              "send": { "type": "number" },
+              "totalPastas": { "type": "number" },
+              "storageMapeado": { "type": "number" },
+              "storageEnviado": { "type": "number" }
+            }
+          }
+        }
+      },
+      "required": ["clientId", "clientName", "status", "description", "startDate", "endDate", "updatedAt"]
+    },
+    "AIInteraction": {
+      "title": "AI Interaction",
+      "description": "Logs of AI assistant interactions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "prompt": { "type": "string" },
+        "response": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "prompt", "response", "timestamp"]
+    }
+  },
+  "firestore": {
+    "clients": { "schema": "Client", "description": "Base de clientes" },
+    "migrations": { "schema": "Migration", "description": "Dados de migração" },
+    "ai_interactions": { "schema": "AIInteraction", "description": "Log de IA" }
+  }
+}
