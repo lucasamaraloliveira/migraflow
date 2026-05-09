@@ -55,26 +55,34 @@ export interface Client {
 
 export interface Disk {
   path: string;
-  status: 'Realizado' | 'Realizando' | 'Pendente';
+  status: 'Realizado' | 'Realizando' | 'Pendente' | 'Pausado';
   pastasRealizadas: number;
   estudos: number;
   send: number;
   totalPastas: number;
   storageMapeado: number;
   storageEnviado: number;
+  destination?: string;
+}
+
+export interface DiskGroup {
+  id: string;
+  title: string;
+  disks: Disk[];
 }
 
 export interface Migration {
   id?: string;
   clientId: string;
   clientName: string;
-  status: 'pendente' | 'em_progresso' | 'concluida' | 'atrasada';
+  status: 'pendente' | 'em_progresso' | 'pausado' | 'concluida' | 'atrasada';
   description: string;
   startDate: string;
   endDate: string;
   reportUrl?: string;
   imageUrl?: string;
   disks?: Disk[];
+  groups?: DiskGroup[];
   updatedAt: any;
 }
 
@@ -113,7 +121,15 @@ export function useClients() {
     }
   };
 
-  return { clients, loading, addClient, deleteClient };
+  const updateClient = async (id: string, data: Partial<Client>) => {
+    try {
+      await updateDoc(doc(db, 'clients', id), data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `clients/${id}`);
+    }
+  };
+
+  return { clients, loading, addClient, deleteClient, updateClient };
 }
 
 export function useMigrations() {

@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthGuard, useAuth } from '@/components/auth-provider';
 import Image from 'next/image';
-import { 
-  Users, 
-  BarChart3, 
-  LogOut, 
-  Plus, 
-  ChevronRight, 
-  Clock, 
-  CheckCircle2, 
+import {
+  Users,
+  BarChart3,
+  LogOut,
+  Plus,
+  ChevronRight,
+  ChevronLeft,
+  Clock,
+  CheckCircle2,
   AlertCircle,
   MessageSquare,
   FileText,
@@ -23,27 +24,30 @@ import {
   ArrowUpRight,
   Trash2,
   Settings2,
-  Sparkles
+  Sparkles,
+  Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useClients, useMigrations, Disk } from '@/hooks/use-firestore';
+import * as XLSX from 'xlsx';
+import { useClients, useMigrations, Disk, DiskGroup } from '@/hooks/use-firestore';
 import { format } from 'date-fns';
 // Removed client-side GoogleGenAI import for security
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
   Cell,
   LineChart,
   Line,
   AreaChart,
-  Area
+  Area,
+  LabelList
 } from 'recharts';
 
 // AI initialization removed from client side for security.
@@ -60,12 +64,18 @@ export default function Home() {
 function DashboardContent() {
   const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'migrations'>('overview');
-  const { clients, addClient, deleteClient } = useClients();
+  const { clients, addClient, deleteClient, updateClient } = useClients();
   const { migrations, addMigration, updateMigration, deleteMigration } = useMigrations();
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [clientToEdit, setClientToEdit] = useState<any | null>(null);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedMigrationId, setSelectedMigrationId] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const getClientName = (m: any) => {
+    return clients.find(c => c.id === m.clientId)?.name || m.clientName;
+  };
 
   // Stats
   const stats = [
@@ -80,7 +90,7 @@ function DashboardContent() {
     const totalEstudos = m.disks?.reduce((acc, d) => acc + (d.estudos || 0), 0) || 0;
     const totalPastas = m.disks?.reduce((acc, d) => acc + (d.totalPastas || 0), 0) || 0;
     return {
-      name: m.clientName.split(' ')[0],
+      name: getClientName(m),
       estudos: totalEstudos,
       pastas: totalPastas,
     };
@@ -89,6 +99,7 @@ function DashboardContent() {
   const statusData = [
     { name: 'Pendente', value: migrations.filter(m => m.status === 'pendente').length, color: '#94a3b8' },
     { name: 'Execução', value: migrations.filter(m => m.status === 'em_progresso').length, color: '#2563eb' },
+    { name: 'Pausado', value: migrations.filter(m => m.status === 'pausado').length, color: '#f43f5e' },
     { name: 'Concluída', value: migrations.filter(m => m.status === 'concluida').length, color: '#10b981' },
     { name: 'Atrasada', value: migrations.filter(m => m.status === 'atrasada').length, color: '#f43f5e' },
   ].filter(d => d.value > 0);
@@ -98,60 +109,91 @@ function DashboardContent() {
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
       {/* Sidebar Navigation */}
-      <aside className="w-64 bg-slate-900 flex flex-col border-r border-slate-800 shadow-xl z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg">M</div>
-          <span className="text-white font-bold text-lg tracking-tight font-display">MigraFlow</span>
+      <aside className={`${isSidebarCollapsed ? 'w-[100px]' : 'w-72'} bg-slate-900 flex flex-col border-r border-slate-800 shadow-2xl z-20 transition-all duration-500 ease-in-out relative`}>
+        <div className="p-6 flex items-center gap-3 border-b border-slate-800 overflow-hidden min-h-[80px]">
+          <div className="min-w-[32px] w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shrink-0">M</div>
+          {!isSidebarCollapsed && (
+            <motion.span
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="text-white font-bold text-lg tracking-tight font-display whitespace-nowrap"
+            >
+              MigraFlow
+            </motion.span>
+          )}
         </div>
-        
-        <nav className="flex-1 px-4 space-y-1 mt-6">
-          <SidebarLink 
-            icon={BarChart3} 
-            label="Visão Geral" 
-            active={activeTab === 'overview'} 
-            onClick={() => { setActiveTab('overview'); setSelectedMigrationId(null); }} 
+
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute -right-3 top-20 w-6 h-6 bg-blue-600 border border-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-500 transition-all z-30 shadow-[0_0_15px_rgba(37,99,235,0.4)] group/toggle"
+        >
+          {isSidebarCollapsed ? <ChevronRight className="w-3 h-3 transition-transform group-hover/toggle:scale-110" /> : <ChevronLeft className="w-3 h-3 transition-transform group-hover/toggle:scale-110" />}
+        </button>
+
+        <nav className="flex-1 px-4 space-y-1 mt-6 overflow-x-hidden">
+          <SidebarLink
+            icon={BarChart3}
+            label="Visão Geral"
+            active={activeTab === 'overview'}
+            isCollapsed={isSidebarCollapsed}
+            onClick={() => { setActiveTab('overview'); setSelectedMigrationId(null); }}
           />
-          <SidebarLink 
-            icon={Users} 
-            label="Clientes" 
-            active={activeTab === 'clients'} 
-            onClick={() => { setActiveTab('clients'); setSelectedMigrationId(null); }} 
+          <SidebarLink
+            icon={Users}
+            label="Clientes"
+            active={activeTab === 'clients'}
+            isCollapsed={isSidebarCollapsed}
+            onClick={() => { setActiveTab('clients'); setSelectedMigrationId(null); }}
           />
-          <SidebarLink 
-            icon={FileUp} 
-            label="Migrações" 
-            active={activeTab === 'migrations'} 
-            onClick={() => { setActiveTab('migrations'); setSelectedMigrationId(null); }} 
+          <SidebarLink
+            icon={FileUp}
+            label="Migrações"
+            active={activeTab === 'migrations'}
+            isCollapsed={isSidebarCollapsed}
+            onClick={() => { setActiveTab('migrations'); setSelectedMigrationId(null); }}
           />
         </nav>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-950/30">
+        <div className="p-4 border-t border-slate-800 bg-slate-950/30 overflow-hidden">
           <div className="flex items-center gap-3 px-3 py-2">
             {user?.photoURL ? (
-              <Image 
-                src={user.photoURL} 
-                alt="User" 
-                width={32} 
-                height={32} 
-                className="rounded-full border border-slate-700"
+              <Image
+                src={user.photoURL}
+                alt="User"
+                width={32}
+                height={32}
+                className="rounded-full border border-slate-700 shrink-0"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs">
+              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs shrink-0">
                 {user?.displayName?.charAt(0)}
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold truncate text-white uppercase tracking-wider">{user?.displayName}</p>
-              <p className="text-[10px] text-slate-500 truncate lowercase font-mono">conectado</p>
-            </div>
+            {!isSidebarCollapsed && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex-1 min-w-0"
+              >
+                <p className="text-xs font-bold truncate text-white uppercase tracking-wider">{user?.displayName}</p>
+                <p className="text-[10px] text-slate-500 truncate lowercase font-mono">conectado</p>
+              </motion.div>
+            )}
           </div>
-          <button 
+          <button
             onClick={signOut}
-            className="mt-4 flex w-full items-center gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+            className={`mt-8 flex items-center transition-all duration-300 group/logout ${isSidebarCollapsed
+                ? 'flex-col justify-center py-4 gap-2 w-full rounded-2xl'
+                : 'flex-row gap-4 px-5 py-3 w-full rounded-2xl'
+              } text-slate-500 hover:bg-rose-500/10 hover:text-rose-400`}
+            title="Encerrar Sessão"
           >
-            <LogOut className="w-3 h-3" />
-            Encerrar Sessão
+            <LogOut className="w-5 h-5 shrink-0 transition-transform group-logout:scale-110" />
+            <span className={`font-black uppercase tracking-[0.1em] text-center ${isSidebarCollapsed ? 'text-[9px]' : 'text-[10px]'
+              }`}>
+              Sair
+            </span>
           </button>
         </div>
       </aside>
@@ -161,22 +203,22 @@ function DashboardContent() {
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10">
           <div>
             <h2 className="text-xl font-black text-slate-900 font-display">
-              {selectedMigration ? `Detalhamento: ${selectedMigration.clientName}` : (
+              {selectedMigration ? `Detalhamento: ${getClientName(selectedMigration)}` : (
                 activeTab === 'overview' ? 'Painel de Monitoramento' :
-                activeTab === 'clients' ? 'Gestão de Clientes' : 'Projetos de Migração'
+                  activeTab === 'clients' ? 'Gestão de Clientes' : 'Projetos de Migração'
               )}
             </h2>
             <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">
               {selectedMigration ? 'Análise granular de discos e volumetria' : (
                 activeTab === 'overview' ? 'Migração de Dados e Infraestrutura' :
-                activeTab === 'clients' ? 'Controle de Base de Atendimento' : 'Acompanhamento de Fluxo Crítico'
+                  activeTab === 'clients' ? 'Controle de Base de Atendimento' : 'Acompanhamento de Fluxo Crítico'
               )}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             {selectedMigration && (
-              <button 
+              <button
                 onClick={() => setSelectedMigrationId(null)}
                 className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-900 px-3 py-2 transition-colors border border-slate-200 rounded-lg"
               >
@@ -184,7 +226,7 @@ function DashboardContent() {
               </button>
             )}
             {activeTab === 'clients' && (
-              <button 
+              <button
                 onClick={() => setIsClientModalOpen(true)}
                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm uppercase tracking-tight"
               >
@@ -192,7 +234,7 @@ function DashboardContent() {
               </button>
             )}
             {activeTab === 'migrations' && !selectedMigration && (
-              <button 
+              <button
                 onClick={() => setIsMigrationModalOpen(true)}
                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm uppercase tracking-tight"
               >
@@ -211,13 +253,13 @@ function DashboardContent() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <MigrationDetails 
-                  migration={selectedMigration} 
-                  onUpdate={(data) => updateMigration(selectedMigration.id!, data)} 
+                <MigrationDetails
+                  migration={selectedMigration}
+                  onUpdate={(data) => updateMigration(selectedMigration.id!, data)}
                 />
               </motion.div>
             ) : activeTab === 'overview' && (
-              <motion.div 
+              <motion.div
                 key="overview"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -249,16 +291,29 @@ function DashboardContent() {
                     </h3>
                     <div className="flex-1">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData}>
+                        <BarChart data={chartData} margin={{ bottom: 40 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                          <XAxis dataKey="name" fontSize={10} stroke="#94a3b8" />
+                          <XAxis 
+                            dataKey="name" 
+                            fontSize={10} 
+                            stroke="#94a3b8" 
+                            interval={0} 
+                            angle={-15} 
+                            textAnchor="end" 
+                            height={60}
+                          />
                           <YAxis fontSize={10} stroke="#94a3b8" />
-                          <Tooltip 
+                          <Tooltip
+                            formatter={(value: any) => value?.toLocaleString() || '0'}
                             contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff' }}
                             itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
                           />
-                          <Bar dataKey="estudos" fill="#2563eb" radius={[4, 4, 0, 0]} name="Estudos" />
-                          <Bar dataKey="pastas" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Pastas" />
+                          <Bar dataKey="estudos" fill="#2563eb" radius={[4, 4, 0, 0]} name="Estudos">
+                            <LabelList dataKey="estudos" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#1e293b' }} />
+                          </Bar>
+                          <Bar dataKey="pastas" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Pastas">
+                            <LabelList dataKey="pastas" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#64748b' }} />
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -320,7 +375,7 @@ function DashboardContent() {
                           {migrations.slice(0, 8).map((m, i) => (
                             <tr key={i} className="hover:bg-slate-50/80 transition-colors group">
                               <td className="p-4 pl-6">
-                                <div className="font-bold text-slate-900">{m.clientName}</div>
+                                <div className="font-bold text-slate-900">{getClientName(m)}</div>
                                 <div className="text-[10px] text-slate-400 font-mono uppercase tracking-tighter">REF-{m.id?.slice(-4)}</div>
                               </td>
                               <td className="p-4 text-center">
@@ -370,7 +425,7 @@ function DashboardContent() {
             )}
 
             {activeTab === 'clients' && (
-              <motion.div 
+              <motion.div
                 key="clients"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -407,12 +462,25 @@ function DashboardContent() {
                             {client.createdAt?.seconds ? format(new Date(client.createdAt.seconds * 1000), 'dd.MM.yyyy') : '...'}
                           </td>
                           <td className="px-6 py-4 text-right pr-12">
-                            <button 
-                              onClick={() => deleteClient(client.id!)}
-                              className="text-[10px] font-black text-rose-600 uppercase tracking-widest hover:bg-rose-50 px-3 py-1.5 rounded-md transition-all border border-transparent hover:border-rose-100"
-                            >
-                              Remover
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  setClientToEdit(client);
+                                  setIsClientModalOpen(true);
+                                }}
+                                className="p-2 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-all"
+                                title="Editar Cliente"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteClient(client.id!)}
+                                className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
+                                title="Remover Cliente"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -423,7 +491,7 @@ function DashboardContent() {
             )}
 
             {activeTab === 'migrations' && (
-              <motion.div 
+              <motion.div
                 key="migrations"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -445,11 +513,11 @@ function DashboardContent() {
                       {migrations.map((m) => (
                         <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
                           <td className="px-6 py-4">
-                            <button 
+                            <button
                               onClick={() => setSelectedMigrationId(m.id!)}
                               className="text-left group/btn"
                             >
-                              <p className="text-sm font-bold text-slate-900 uppercase tracking-tighter group-hover/btn:text-blue-600 transition-colors">{m.clientName}</p>
+                              <p className="text-sm font-bold text-slate-900 uppercase tracking-tighter group-hover/btn:text-blue-600 transition-colors">{getClientName(m)}</p>
                               <span className="text-[10px] font-mono text-slate-400 italic">REFSUB-{m.id?.slice(-6)}</span>
                             </button>
                           </td>
@@ -459,20 +527,21 @@ function DashboardContent() {
                           <td className="px-6 py-4">
                             <div className="flex flex-col items-center gap-1.5">
                               <StatusBadge status={m.status} />
-                              <select 
+                              <select
                                 value={m.status}
                                 onChange={(e) => updateMigration(m.id!, { status: e.target.value as any })}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] bg-slate-100 rounded px-1.5 py-0.5 cursor-pointer outline-none border border-slate-200 font-bold uppercase"
                               >
                                 <option value="pendente">Pendente</option>
                                 <option value="em_progresso">Execução</option>
+                                <option value="pausado">Pausado</option>
                                 <option value="concluida">Concluída</option>
                                 <option value="atrasada">Atraso</option>
                               </select>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <button 
+                            <button
                               onClick={() => setSelectedMigrationId(m.id!)}
                               className="text-[10px] font-black text-blue-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 hover:underline transition-all"
                             >
@@ -481,13 +550,13 @@ function DashboardContent() {
                           </td>
                           <td className="px-6 py-4 text-right pr-6">
                             <div className="flex items-center justify-end gap-3">
-                              <button 
+                              <button
                                 onClick={() => deleteMigration(m.id!)}
                                 className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-lg transition-all border border-transparent hover:border-rose-100 opacity-0 group-hover:opacity-100"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
-                              <button 
+                              <button
                                 onClick={() => setSelectedMigrationId(m.id!)}
                                 className="p-2 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-lg transition-all border border-transparent hover:border-blue-100"
                               >
@@ -506,7 +575,7 @@ function DashboardContent() {
         </div>
 
         {/* AI Floating Trigger */}
-        <button 
+        <button
           onClick={() => setIsChatOpen(true)}
           className="fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white p-4 rounded-xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group flex items-center gap-3 z-30"
         >
@@ -517,26 +586,52 @@ function DashboardContent() {
 
         {/* Modals & AI Panel (Drawer Side) */}
         <MigrationModal isOpen={isMigrationModalOpen} onClose={() => setIsMigrationModalOpen(false)} clients={clients} onAdd={addMigration} />
-        <ClientModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} onAdd={addClient} />
+        <ClientModal
+          isOpen={isClientModalOpen}
+          onClose={() => {
+            setIsClientModalOpen(false);
+            setClientToEdit(null);
+          }}
+          onAdd={addClient}
+          onUpdate={updateClient}
+          clientToEdit={clientToEdit}
+        />
         <AIChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} migrations={migrations} />
       </main>
     </div>
   );
 }
 
-function SidebarLink({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
+function SidebarLink({ icon: Icon, label, active, onClick, isCollapsed }: { icon: any, label: string, active: boolean, onClick: () => void, isCollapsed?: boolean }) {
   return (
-    <button 
+    <button
       onClick={onClick}
-      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-all duration-200 border ${
-        active 
-          ? 'bg-blue-600/10 text-blue-400 border-blue-500/30 shadow-[0_0_15px_rgba(37,99,235,0.05)]' 
-          : 'text-slate-400 border-transparent hover:bg-slate-800/50 hover:text-slate-200'
-      }`}
+      className={`flex items-center w-full rounded-xl transition-all duration-300 border group relative ${active
+          ? 'bg-blue-600/10 text-blue-400 border-blue-500/20 shadow-[inset_0_0_12px_rgba(37,99,235,0.05)]'
+          : 'text-slate-500 border-transparent hover:bg-slate-800/40 hover:text-slate-200'
+        } ${isCollapsed ? 'flex-col justify-center py-4 px-1 gap-2' : 'px-5 py-3 gap-4'}`}
     >
-      <Icon className={`w-5 h-5 ${active ? 'text-blue-500' : 'text-slate-500'}`} />
-      <span className={`text-xs font-bold uppercase tracking-widest ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>{label}</span>
-      {active && <div className="ml-auto w-1 h-4 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.5)]" />}
+      <Icon className={`${isCollapsed ? 'w-6 h-6' : 'w-5 h-5'} shrink-0 transition-transform duration-300 ${active ? 'text-blue-500 scale-110' : 'text-slate-500 group-hover:text-slate-200 group-hover:scale-110'}`} />
+
+      <span className={`font-black uppercase transition-all duration-300 ${isCollapsed
+          ? 'text-[9px] leading-tight tracking-tight text-center'
+          : `text-xs tracking-[0.15em] whitespace-nowrap ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`
+        }`}>
+        {label}
+      </span>
+
+      {active && !isCollapsed && (
+        <motion.div
+          layoutId="activeTab"
+          className="ml-auto w-1 h-6 bg-blue-500 rounded-full shadow-[0_0_12px_rgba(37,99,235,0.6)]"
+        />
+      )}
+      {active && isCollapsed && (
+        <motion.div
+          layoutId="activeTabCollapsed"
+          className="absolute right-0 top-3 bottom-3 w-1.5 bg-blue-600 rounded-l-full shadow-[0_0_12px_rgba(37,99,235,0.6)]"
+        />
+      )}
     </button>
   );
 }
@@ -545,6 +640,7 @@ function StatusBadge({ status, minimal = false }: { status: string, minimal?: bo
   const configs: Record<string, { label: string, color: string, bg: string, border: string }> = {
     pendente: { label: 'Em Análise', color: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200' },
     em_progresso: { label: 'Executando', color: 'text-blue-700', bg: 'bg-blue-100/50', border: 'border-blue-200/50' },
+    pausado: { label: 'Interrompido', color: 'text-rose-700', bg: 'bg-rose-100/50', border: 'border-rose-200/50' },
     concluida: { label: 'Finalizado', color: 'text-emerald-700', bg: 'bg-emerald-100/50', border: 'border-emerald-200/50' },
     atrasada: { label: 'Crítico', color: 'text-rose-700', bg: 'bg-rose-100/50', border: 'border-rose-200/50' },
   };
@@ -563,24 +659,38 @@ function StatusBadge({ status, minimal = false }: { status: string, minimal?: bo
 }
 
 // Modal Components
-function ClientModal({ isOpen, onClose, onAdd }: { isOpen: boolean, onClose: () => void, onAdd: (c: any) => Promise<void> }) {
+function ClientModal({ isOpen, onClose, onAdd, onUpdate, clientToEdit }: { isOpen: boolean, onClose: () => void, onAdd: (c: any) => Promise<void>, onUpdate?: (id: string, data: any) => Promise<void>, clientToEdit?: any }) {
   const [formData, setFormData] = useState({ name: '', email: '', company: '' });
+
+  useEffect(() => {
+    if (clientToEdit) {
+      setFormData({
+        name: clientToEdit.name || '',
+        email: clientToEdit.email || '',
+        company: clientToEdit.company || ''
+      });
+    } else {
+      setFormData({ name: '', email: '', company: '' });
+    }
+  }, [clientToEdit, isOpen]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="w-full max-w-md bg-white rounded-xl p-8 shadow-2xl border border-slate-200"
       >
-        <h3 className="text-xl font-black mb-6 font-display uppercase tracking-tight text-slate-900">Cadastrar Novo Cliente</h3>
+        <h3 className="text-xl font-black mb-6 font-display uppercase tracking-tight text-slate-900">
+          {clientToEdit ? 'Editar Cliente' : 'Cadastrar Novo Cliente'}
+        </h3>
         <div className="space-y-4">
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nome Completo</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
               placeholder="Ex: João da Silva"
               value={formData.name}
@@ -589,8 +699,8 @@ function ClientModal({ isOpen, onClose, onAdd }: { isOpen: boolean, onClose: () 
           </div>
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">E-mail Corporativo</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
               placeholder="exemplo@email.com"
               value={formData.email}
@@ -599,8 +709,8 @@ function ClientModal({ isOpen, onClose, onAdd }: { isOpen: boolean, onClose: () 
           </div>
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Empresa / Unidade</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
               placeholder="Ex: Tech Solutions"
               value={formData.company}
@@ -610,15 +720,19 @@ function ClientModal({ isOpen, onClose, onAdd }: { isOpen: boolean, onClose: () 
         </div>
         <div className="flex gap-3 mt-8">
           <button onClick={onClose} className="flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">Cancelar</button>
-          <button 
+          <button
             onClick={async () => {
-              await onAdd(formData);
+              if (clientToEdit && onUpdate) {
+                await onUpdate(clientToEdit.id, formData);
+              } else {
+                await onAdd(formData);
+              }
               onClose();
               setFormData({ name: '', email: '', company: '' });
             }}
             className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95"
           >
-            Cadastrar
+            {clientToEdit ? 'Atualizar' : 'Cadastrar'}
           </button>
         </div>
       </motion.div>
@@ -627,57 +741,178 @@ function ClientModal({ isOpen, onClose, onAdd }: { isOpen: boolean, onClose: () 
 }
 
 function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, onClose: () => void, clients: any[], onAdd: (m: any) => Promise<void> }) {
-  const [formData, setFormData] = useState({ 
-    clientId: '', 
-    description: '', 
+  const [formData, setFormData] = useState({
+    clientId: '',
+    description: '',
     status: 'pendente' as const,
     startDate: format(new Date(), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
     reportUrl: '',
     imageUrl: '',
-    disks: [] as Disk[]
+    groups: [{ id: 'default', title: 'Unidade Principal', disks: [] }] as DiskGroup[]
   });
 
   if (!isOpen) return null;
 
-  const addDisk = () => {
+  const addGroup = () => {
     setFormData({
       ...formData,
-      disks: [...formData.disks, { 
-        path: '', status: 'Pendente', pastasRealizadas: 0, estudos: 0, 
-        send: 0, totalPastas: 0, storageMapeado: 0, storageEnviado: 0 
-      }]
+      groups: [...formData.groups, { id: crypto.randomUUID(), title: 'Nova Unidade', disks: [] }]
     });
   };
 
-  const removeDisk = (idx: number) => {
-    const newDisks = [...formData.disks];
-    newDisks.splice(idx, 1);
-    setFormData({ ...formData, disks: newDisks });
+  const removeGroup = (groupId: string) => {
+    setFormData({
+      ...formData,
+      groups: formData.groups.filter(g => g.id !== groupId)
+    });
   };
 
-  const updateDisk = (idx: number, data: Partial<Disk>) => {
-    const newDisks = [...formData.disks];
-    newDisks[idx] = { ...newDisks[idx], ...data };
-    setFormData({ ...formData, disks: newDisks });
+  const updateGroupTitle = (groupId: string, title: string) => {
+    setFormData({
+      ...formData,
+      groups: formData.groups.map(g => g.id === groupId ? { ...g, title } : g)
+    });
+  };
+
+  const addDiskToGroup = (groupId: string) => {
+    setFormData({
+      ...formData,
+      groups: formData.groups.map(g => g.id === groupId ? {
+        ...g,
+        disks: [...g.disks, {
+          path: '', status: 'Pendente', pastasRealizadas: 0, estudos: 0,
+          send: 0, totalPastas: 0, storageMapeado: 0, storageEnviado: 0
+        }]
+      } : g)
+    });
+  };
+
+  const removeDiskFromGroup = (groupId: string, diskIdx: number) => {
+    setFormData({
+      ...formData,
+      groups: formData.groups.map(g => g.id === groupId ? {
+        ...g,
+        disks: g.disks.filter((_: Disk, i: number) => i !== diskIdx)
+      } : g)
+    });
+  };
+
+  const updateDiskInGroup = (groupId: string, diskIdx: number, data: Partial<Disk>) => {
+    setFormData({
+      ...formData,
+      groups: formData.groups.map(g => g.id === groupId ? {
+        ...g,
+        disks: g.disks.map((d: Disk, i: number) => i === diskIdx ? { ...d, ...data } : d)
+      } : g)
+    });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, groupId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const bstr = event.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+      const headerRowIdx = rows.findIndex(r =>
+        r.some(c => {
+          const val = String(c || '').toLowerCase();
+          return val.includes('caminho') || val.includes('path');
+        })
+      );
+
+      if (headerRowIdx === -1) {
+        alert("Não foi possível encontrar a coluna 'Caminho' na planilha.");
+        return;
+      }
+
+      const headers = Array.from(rows[headerRowIdx] || []).map(h => String(h || '').toLowerCase().trim());
+      const dataRows = rows.slice(headerRowIdx + 1);
+
+      const findIdx = (aliases: string[]) => {
+        return headers.findIndex(h =>
+          h && aliases.some(alias => h.includes(alias.toLowerCase().trim()))
+        );
+      };
+
+      const sanitizeNum = (val: any) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        const cleanVal = String(val).replace(/[^\d,.-]/g, '').replace(',', '.');
+        return parseFloat(cleanVal) || 0;
+      };
+
+      let lastCumulative = 0;
+      const importedDisks: Disk[] = dataRows
+        .filter(row => row.length > 0 && row[findIdx(['caminho', 'path'])])
+        .map(row => {
+          const pathIdx = findIdx(['caminho', 'path', 'disco', 'origem']);
+          const statusIdx = findIdx(['status']);
+          const realIdx = findIdx(['realizac', 'realizadas', 'migradas', 'realizados']);
+          const estIdx = findIdx(['estudos', 'exames']);
+          const sendIdx = findIdx(['send', 'enviado']);
+          const totIdx = findIdx(['total pastas', 'total']);
+          const mapIdx = findIdx(['storage mapeado', 'mapeado', 'tamanho']);
+          const envIdx = findIdx(['storage enviado', 'enviado']);
+          const destIdx = findIdx(['destino', 'destination', 'target']);
+
+          const currentPath = String(pathIdx !== -1 ? row[pathIdx] : '');
+          const currentCumulative = sanitizeNum(realIdx !== -1 ? row[realIdx] : 0);
+          const total = sanitizeNum(totIdx !== -1 ? row[totIdx] : 0);
+
+          if (currentCumulative < lastCumulative) {
+            lastCumulative = 0;
+          }
+
+          const individualRealized = Math.max(0, currentCumulative - lastCumulative);
+          lastCumulative = currentCumulative;
+
+          const statusVal = String(statusIdx !== -1 ? row[statusIdx] : '').toLowerCase();
+          const isFinished = statusVal.includes('realizado') || statusVal.includes('concluido') || statusVal.includes('finalizado') || (individualRealized >= total && total > 0);
+
+          return {
+            path: currentPath,
+            status: isFinished ? 'Realizado' : 'Pendente',
+            pastasRealizadas: isFinished ? total : individualRealized,
+            estudos: sanitizeNum(estIdx !== -1 ? row[estIdx] : 0),
+            send: sanitizeNum(sendIdx !== -1 ? row[sendIdx] : 0),
+            totalPastas: total,
+            storageMapeado: sanitizeNum(mapIdx !== -1 ? row[mapIdx] : 0),
+            storageEnviado: sanitizeNum(envIdx !== -1 ? row[envIdx] : 0),
+            destination: destIdx !== -1 ? String(row[destIdx]) : undefined
+          };
+        });
+
+      setFormData(prev => ({
+        ...prev,
+        groups: prev.groups.map(g => g.id === groupId ? { ...g, disks: [...g.disks, ...importedDisks] } : g)
+      }));
+    };
+    reader.readAsBinaryString(file);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-2xl bg-white rounded-xl p-8 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-4xl bg-white rounded-xl p-8 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-black font-display uppercase tracking-tight text-slate-900">Novo Projeto de Migração</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-full text-slate-400"><X className="w-5 h-5" /></button>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-6">
-          <div className="col-span-2">
+          <div className="col-span-2 md:col-span-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Cliente Alvo</label>
-            <select 
+            <select
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none appearance-none"
               value={formData.clientId}
               onChange={e => setFormData({ ...formData, clientId: e.target.value })}
@@ -686,75 +921,105 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
               {clients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.company})</option>)}
             </select>
           </div>
-          
+
+          <div className="col-span-2 md:col-span-1 grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Data Início</label>
+              <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Data Previsão</label>
+              <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
+            </div>
+          </div>
+
           <div className="col-span-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Escopo e Especificação</label>
-            <textarea 
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none min-h-[80px] transition-all"
+            <textarea
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none min-h-[60px] transition-all"
               placeholder="Descreva o escopo técnico..."
               value={formData.description}
               onChange={e => setFormData({ ...formData, description: e.target.value })}
             />
           </div>
 
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Data Início</label>
-            <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
-          </div>
-          
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Data Previsão</label>
-            <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
-          </div>
-
-          <div className="col-span-2 space-y-4">
+          <div className="col-span-2 space-y-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Mapeamento de Discos</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Configuração de Unidades e Discos</label>
               <button 
-                onClick={addDisk}
-                className="text-[10px] bg-slate-900 text-white px-3 py-1 rounded font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-1"
+                onClick={addGroup}
+                className="text-[10px] bg-slate-900 text-white px-4 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm"
               >
-                <Plus className="w-3 h-3" /> Add Disco
+                <Plus className="w-3.5 h-3.5" /> Adicionar Unidade
               </button>
             </div>
-            
-            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-              {formData.disks.map((disk, idx) => (
-                <div key={idx} className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-200 group">
-                  <div className="flex-1">
+
+            <div className="space-y-6">
+              {formData.groups.map((group) => (
+                <div key={group.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
+                  <div className="flex justify-between items-center gap-4">
                     <input 
                       type="text" 
-                      placeholder="Caminho / Host" 
-                      className="w-full bg-transparent text-[11px] font-mono outline-none"
-                      value={disk.path}
-                      onChange={e => updateDisk(idx, { path: e.target.value })}
+                      className="flex-1 bg-white border border-slate-200 rounded-lg p-2 text-xs font-black uppercase tracking-tight outline-none focus:ring-2 focus:ring-blue-600"
+                      value={group.title}
+                      onChange={e => updateGroupTitle(group.id, e.target.value)}
+                      placeholder="Nome da Unidade (ex: Matriz, Setor A)"
                     />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">TB Total</span>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        className="w-12 bg-white border border-slate-200 rounded text-right p-0.5 text-[10px] outline-none"
-                        value={disk.storageMapeado}
-                        onChange={e => updateDisk(idx, { storageMapeado: Number(e.target.value) })}
-                      />
+                    <div className="flex gap-2">
+                      <label className="text-[10px] bg-blue-600 text-white px-3 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm">
+                        <FileUp className="w-3.5 h-3.5" /> Importar
+                        <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
+                      </label>
+                      <button 
+                        onClick={() => addDiskToGroup(group.id)}
+                        className="text-[10px] bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Disco
+                      </button>
+                      {formData.groups.length > 1 && (
+                        <button onClick={() => removeGroup(group.id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                      )}
                     </div>
-                    <button onClick={() => removeDisk(idx)} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3 h-3" /></button>
+                  </div>
+
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                    {group.disks.map((disk: Disk, idx: number) => (
+                      <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-100 group">
+                        <input
+                          type="text"
+                          placeholder="Caminho / Host"
+                          className="flex-1 bg-transparent text-[11px] font-mono outline-none"
+                          value={disk.path}
+                          onChange={e => updateDiskInGroup(group.id, idx, { path: e.target.value })}
+                        />
+                        <div className="flex items-center gap-4">
+                          <div className="flex flex-col items-end">
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">TB Total</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-12 bg-slate-50 border border-slate-200 rounded text-right p-0.5 text-[10px] outline-none"
+                              value={disk.storageMapeado}
+                              onChange={e => updateDiskInGroup(group.id, idx, { storageMapeado: Number(e.target.value) })}
+                            />
+                          </div>
+                          <button onClick={() => removeDiskFromGroup(group.id, idx)} className="p-1 text-slate-300 hover:text-rose-600 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </div>
+                    ))}
+                    {group.disks.length === 0 && (
+                      <p className="text-center py-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest italic border border-dashed border-slate-200 rounded-lg">Aguardando mapeamento...</p>
+                    )}
                   </div>
                 </div>
               ))}
-              {formData.disks.length === 0 && (
-                <p className="text-center py-4 text-[10px] font-bold text-slate-300 uppercase tracking-widest italic border-2 border-dashed border-slate-100 rounded-lg">Nenhum disco inicial</p>
-              )}
             </div>
           </div>
         </div>
 
-        <div className="flex gap-3 mt-8">
+        <div className="flex gap-3 mt-8 pt-6 border-t border-slate-100">
           <button onClick={onClose} className="flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">Cancelar</button>
-          <button 
+          <button
             disabled={!formData.clientId}
             onClick={async () => {
               const client = clients.find(c => c.id === formData.clientId);
@@ -786,7 +1051,7 @@ function AIChatDrawer({ isOpen, onClose, migrations }: { isOpen: boolean, onClos
 
     try {
       const context = migrations.map(m => `- Cliente: ${m.clientName}, Status: ${m.status}, Descrição: ${m.description}, Início: ${m.startDate}, Fim: ${m.endDate}`).join('\n');
-      
+
       const prompt = `Você é uma IA analista sênior do sistema MigraFlow. Analise os estados abaixo e responda como um assistente técnico preciso:\n${context}\n\nAnalista: "${userMsg}"`;
 
       const res = await fetch('/api/ai', {
@@ -812,14 +1077,14 @@ function AIChatDrawer({ isOpen, onClose, migrations }: { isOpen: boolean, onClos
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-40"
           />
-          <motion.div 
+          <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -843,19 +1108,18 @@ function AIChatDrawer({ isOpen, onClose, migrations }: { isOpen: boolean, onClos
                 <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1 italic">IA System Ready:</p>
                 Analista sênior conectado. Forneça instruções para análise de fluxo, checksum de dados ou relatórios de status.
               </div>
-              
+
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-4 rounded-xl text-[13px] leading-relaxed shadow-lg ${
-                    m.role === 'user' 
-                      ? 'bg-blue-600 text-white rounded-tr-none font-medium' 
+                  <div className={`max-w-[85%] p-4 rounded-xl text-[13px] leading-relaxed shadow-lg ${m.role === 'user'
+                      ? 'bg-blue-600 text-white rounded-tr-none font-medium'
                       : 'bg-slate-800/60 text-slate-200 rounded-tl-none border border-slate-800'
-                  }`}>
+                    }`}>
                     {m.content}
                   </div>
                 </div>
               ))}
-              
+
               {loading && (
                 <div className="flex justify-start">
                   <div className="bg-slate-800/30 p-4 rounded-xl rounded-tl-none border border-slate-800">
@@ -867,7 +1131,7 @@ function AIChatDrawer({ isOpen, onClose, migrations }: { isOpen: boolean, onClos
 
             <div className="p-6 border-t border-slate-800 bg-slate-900">
               <div className="relative flex items-center">
-                <input 
+                <input
                   type="text"
                   placeholder="Instrução analítica..."
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg py-4 pl-4 pr-12 text-xs text-slate-200 focus:outline-none focus:border-blue-500 placeholder-slate-600 shadow-inner transition-colors"
@@ -875,7 +1139,7 @@ function AIChatDrawer({ isOpen, onClose, migrations }: { isOpen: boolean, onClos
                   onChange={e => setInput(e.target.value)}
                   onKeyPress={e => e.key === 'Enter' && sendMessage()}
                 />
-                <button 
+                <button
                   onClick={sendMessage}
                   disabled={!input.trim() || loading}
                   className="absolute right-2 p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all active:scale-90 disabled:opacity-30"
@@ -905,25 +1169,27 @@ function LoaderPulse() {
 // Detailed Migration View
 function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (data: any) => Promise<void> }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editedDisks, setEditedDisks] = useState<Disk[]>(migration.disks || []);
+  const [editedGroups, setEditedGroups] = useState<DiskGroup[]>(
+    migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }])
+  );
 
   const parseNum = (val: any) => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
-    // Remove dots (common thousand separator in PT-BR) and replace comma with dot for decimal
     const cleanVal = String(val).replace(/\./g, '').replace(',', '.');
     return parseFloat(cleanVal) || 0;
   };
 
+  const allDisks = editedGroups.flatMap(g => g.disks);
+
   const summary = {
-    totalPastas: editedDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0),
-    pastasRealizadas: editedDisks.reduce((acc, d) => {
+    totalPastas: allDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0),
+    pastasRealizadas: allDisks.reduce((acc, d) => {
       const total = parseNum(d.totalPastas);
       const realized = parseNum(d.pastasRealizadas);
-      // Cap realized by total to avoid over-counting cumulative data in the summary
       return acc + Math.min(realized, total);
     }, 0),
-    estudosEnviados: editedDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0),
+    estudosEnviados: allDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0),
     progresso: 0
   };
 
@@ -931,42 +1197,143 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
   const realized = summary.pastasRealizadas;
   summary.progresso = total > 0 ? Number(((realized / total) * 100).toFixed(2)) : 0;
 
-  const addDisk = () => {
-    setEditedDisks([...editedDisks, { 
-      path: '', 
-      status: 'Pendente', 
-      pastasRealizadas: 0, 
-      estudos: 0, 
-      send: 0, 
-      totalPastas: 0, 
-      storageMapeado: 0, 
-      storageEnviado: 0 
-    }]);
+  const addGroup = () => {
+    setEditedGroups([...editedGroups, { id: crypto.randomUUID(), title: 'Nova Unidade', disks: [] }]);
     setIsEditing(true);
   };
 
-  const removeDisk = (index: number) => {
-    const newDisks = [...editedDisks];
-    newDisks.splice(index, 1);
-    setEditedDisks(newDisks);
+  const removeGroup = (groupId: string) => {
+    setEditedGroups(editedGroups.filter(g => g.id !== groupId));
     setIsEditing(true);
   };
 
-  const updateDisk = (index: number, data: Partial<Disk>) => {
-    const newDisks = [...editedDisks];
-    newDisks[index] = { ...newDisks[index], ...data };
-    setEditedDisks(newDisks);
+  const updateGroupTitle = (groupId: string, title: string) => {
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? { ...g, title } : g));
     setIsEditing(true);
+  };
+
+  const addDiskToGroup = (groupId: string) => {
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+      ...g,
+      disks: [...g.disks, {
+        path: '', status: 'Pendente', pastasRealizadas: 0, estudos: 0,
+        send: 0, totalPastas: 0, storageMapeado: 0, storageEnviado: 0
+      }]
+    } : g));
+    setIsEditing(true);
+  };
+
+  const removeDiskFromGroup = (groupId: string, diskIdx: number) => {
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+      ...g,
+      disks: g.disks.filter((_: Disk, i: number) => i !== diskIdx)
+    } : g));
+    setIsEditing(true);
+  };
+
+  const updateDiskInGroup = (groupId: string, diskIdx: number, data: Partial<Disk>) => {
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+      ...g,
+      disks: g.disks.map((d: Disk, i: number) => i === diskIdx ? { ...d, ...data } : d)
+    } : g));
+    setIsEditing(true);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, groupId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const bstr = event.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+      const headerRowIdx = rows.findIndex(r =>
+        r.some(c => {
+          const val = String(c || '').toLowerCase();
+          return val.includes('caminho') || val.includes('path');
+        })
+      );
+
+      if (headerRowIdx === -1) {
+        alert("Não foi possível encontrar a coluna 'Caminho' na planilha.");
+        return;
+      }
+
+      const headers = Array.from(rows[headerRowIdx] || []).map(h => String(h || '').toLowerCase().trim());
+      const dataRows = rows.slice(headerRowIdx + 1);
+
+      const findIdx = (aliases: string[]) => {
+        return headers.findIndex(h =>
+          h && aliases.some(alias => h.includes(alias.toLowerCase().trim()))
+        );
+      };
+
+      const sanitizeNum = (val: any) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        const cleanVal = String(val).replace(/[^\d,.-]/g, '').replace(',', '.');
+        return parseFloat(cleanVal) || 0;
+      };
+
+      let lastCumulative = 0;
+      const importedDisks: Disk[] = dataRows
+        .filter(row => row.length > 0 && row[findIdx(['caminho', 'path'])])
+        .map(row => {
+          const pathIdx = findIdx(['caminho', 'path', 'disco', 'origem']);
+          const statusIdx = findIdx(['status']);
+          const realIdx = findIdx(['realizac', 'realizadas', 'migradas', 'realizados']);
+          const estIdx = findIdx(['estudos', 'exames']);
+          const sendIdx = findIdx(['send', 'enviado']);
+          const totIdx = findIdx(['total pastas', 'total']);
+          const mapIdx = findIdx(['storage mapeado', 'mapeado', 'tamanho']);
+          const envIdx = findIdx(['storage enviado', 'enviado']);
+          const destIdx = findIdx(['destino', 'destination', 'target']);
+
+          const currentPath = String(pathIdx !== -1 ? row[pathIdx] : '');
+          const currentCumulative = sanitizeNum(realIdx !== -1 ? row[realIdx] : 0);
+          const total = sanitizeNum(totIdx !== -1 ? row[totIdx] : 0);
+
+          if (currentCumulative < lastCumulative) {
+            lastCumulative = 0;
+          }
+
+          const individualRealized = Math.max(0, currentCumulative - lastCumulative);
+          lastCumulative = currentCumulative;
+
+          const statusVal = String(statusIdx !== -1 ? row[statusIdx] : '').toLowerCase();
+          const isFinished = statusVal.includes('realizado') || statusVal.includes('concluido') || statusVal.includes('finalizado') || (individualRealized >= total && total > 0);
+
+          return {
+            path: currentPath,
+            status: isFinished ? 'Realizado' : 'Pendente',
+            pastasRealizadas: isFinished ? total : individualRealized,
+            estudos: sanitizeNum(estIdx !== -1 ? row[estIdx] : 0),
+            send: sanitizeNum(sendIdx !== -1 ? row[sendIdx] : 0),
+            totalPastas: total,
+            storageMapeado: sanitizeNum(mapIdx !== -1 ? row[mapIdx] : 0),
+            storageEnviado: sanitizeNum(envIdx !== -1 ? row[envIdx] : 0),
+            destination: destIdx !== -1 ? String(row[destIdx]) : undefined
+          };
+        });
+
+      setEditedGroups(prev => prev.map(g => g.id === groupId ? { ...g, disks: [...g.disks, ...importedDisks] } : g));
+      setIsEditing(true);
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleSave = async () => {
-    await onUpdate({ disks: editedDisks });
+    await onUpdate({ groups: editedGroups });
     setIsEditing(false);
   };
 
   const generateAISummary = async () => {
     try {
-      const diskContext = editedDisks.map(d => `- Caminho: ${d.path}, Status: ${d.status}, Pastas: ${d.pastasRealizadas}/${d.totalPastas}, Storage: ${d.storageEnviado}/${d.storageMapeado} TB`).join('\n');
+      const diskContext = allDisks.map(d => `- Caminho: ${d.path}, Status: ${d.status}, Pastas: ${d.pastasRealizadas}/${d.totalPastas}, Storage: ${d.storageEnviado}/${d.storageMapeado} TB`).join('\n');
       const prompt = `Gere um resumo executivo técnico curto (máximo 4 parágrafos) para a migração do cliente ${migration.clientName}. 
       Contexto dos discos:\n${diskContext}\n
       Destaque o progresso total (${summary.progresso}%), gargalos e recomendações. Use um tom profissional e direto.`;
@@ -978,9 +1345,7 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
       });
 
       const data = await res.json();
-
       if (data.error) throw new Error(data.error);
-
       alert("Resumo gerado:\n\n" + data.text);
     } catch (error) {
       console.error("AI Error:", error);
@@ -990,14 +1355,14 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        {/* Summary Card - Matches Design in Image */}
-        <div className="lg:col-span-1 border border-blue-200 rounded-lg overflow-hidden shadow-sm h-fit">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+        {/* Summary Card */}
+        <div className="lg:col-span-1 border border-blue-200 rounded-lg overflow-hidden shadow-sm h-fit bg-white">
           <div className="bg-blue-600/20 px-4 py-2 border-b border-blue-200 flex justify-between items-center">
             <h3 className="text-sm font-black text-blue-900 uppercase tracking-tighter">Resumo Executivo</h3>
             <Sparkles className="w-4 h-4 text-blue-600 cursor-pointer hover:scale-110 transition-transform" onClick={generateAISummary} />
           </div>
-          <div className="p-4 space-y-4 bg-white">
+          <div className="p-4 space-y-4">
             <div className="flex justify-between items-center text-xs border-b border-slate-100 pb-2">
               <span className="font-bold text-slate-500">Total de pastas</span>
               <span className="font-mono text-slate-900 font-black">{summary.totalPastas.toLocaleString()}</span>
@@ -1015,111 +1380,159 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
               <span className="font-mono text-blue-600 font-black">{summary.progresso}%</span>
             </div>
           </div>
-          <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex gap-2">
-             <button 
-              onClick={addDisk}
-              className="flex-1 bg-slate-900 text-white py-2 rounded text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-            >
-              <Plus className="w-3 h-3" /> Adicionar Disco
-            </button>
-            {isEditing && (
-              <button 
+          {isEditing && (
+            <div className="p-4 bg-slate-50 border-t border-slate-100">
+              <button
                 onClick={handleSave}
-                className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-all active:scale-95"
-                title="Salvar Alterações"
+                className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
               >
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="w-4 h-4" /> Salvar Alterações
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        {/* Disks Table - Matches Design in Image */}
-        <div className="lg:col-span-4 border border-blue-200 rounded-lg overflow-hidden shadow-sm bg-white">
-          <div className="bg-blue-600/20 px-4 py-2 border-b border-blue-200 flex justify-between items-center">
-            <h3 className="text-sm font-black text-blue-900 uppercase tracking-tighter">Discos - {migration.clientName}</h3>
-            <Settings2 className="w-4 h-4 text-blue-600" />
-          </div>
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse min-w-[750px] table-fixed">
-              <thead>
-                <tr className="bg-slate-50/50 text-[9px] font-black text-slate-500 uppercase tracking-tighter border-b border-slate-200 text-center">
-                  <th className="p-2 text-left w-[22%] border-r border-slate-200">Caminho</th>
-                  <th className="p-2 w-[12%] border-r border-slate-200">Status</th>
-                  <th className="p-2 w-[10%] border-r border-slate-200">Realizadas</th>
-                  <th className="p-2 w-[8%] border-r border-slate-200">Estudos</th>
-                  <th className="p-2 w-[8%] border-r border-slate-200">Send</th>
-                  <th className="p-2 w-[10%] border-r border-slate-200">Total</th>
-                  <th className="p-2 w-[12%] border-r border-slate-200" colSpan={2}>Mapeado</th>
-                  <th className="p-2 w-[12%] border-r border-slate-200" colSpan={2}>Enviado</th>
-                  <th className="p-2 w-[6%]">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {editedDisks.map((disk, idx) => (
-                  <tr key={idx} className="group hover:bg-blue-50/30 transition-colors">
-                    <td className="p-1 border-r border-slate-100">
-                      <input 
-                        type="text" 
-                        value={disk.path} 
-                        onChange={e => updateDisk(idx, { path: e.target.value })}
-                        className="w-full bg-transparent p-1 text-[10px] font-mono text-slate-600 focus:bg-white outline-none rounded border border-transparent focus:border-blue-200"
-                        placeholder="\\servidor\pasta..."
-                      />
-                    </td>
-                    <td className="p-1 border-r border-slate-100 text-center">
-                      <select 
-                        value={disk.status}
-                        onChange={e => updateDisk(idx, { status: e.target.value as any })}
-                        className={`text-[9px] font-bold p-1 rounded-full px-2 w-full outline-none appearance-none text-center cursor-pointer ${
-                          disk.status === 'Realizado' ? 'bg-emerald-100 text-emerald-700' :
-                          disk.status === 'Realizando' ? 'bg-blue-100 text-blue-700' :
-                          'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        <option value="Realizado">Realizado</option>
-                        <option value="Realizando">Realizando</option>
-                        <option value="Pendente">Pendente</option>
-                      </select>
-                    </td>
-                    <td className="p-1 border-r border-slate-100 text-center">
-                      <input type="number" value={disk.pastasRealizadas} onChange={e => updateDisk(idx, { pastasRealizadas: Number(e.target.value) })} className="w-full bg-transparent text-center text-[10px] font-mono outline-none" />
-                    </td>
-                    <td className="p-1 border-r border-slate-100 text-center">
-                      <input type="number" value={disk.estudos} onChange={e => updateDisk(idx, { estudos: Number(e.target.value) })} className="w-full bg-transparent text-center text-[10px] font-mono outline-none" />
-                    </td>
-                    <td className="p-1 border-r border-slate-100 text-center">
-                      <input type="number" value={disk.send} onChange={e => updateDisk(idx, { send: Number(e.target.value) })} className="w-full bg-transparent text-center text-[10px] font-mono outline-none" />
-                    </td>
-                    <td className="p-1 border-r border-slate-100 text-center">
-                      <input type="number" value={disk.totalPastas} onChange={e => updateDisk(idx, { totalPastas: Number(e.target.value) })} className="w-full bg-transparent text-center text-[10px] font-mono outline-none" />
-                    </td>
-                    <td className="p-1 text-center text-[10px] font-mono text-slate-500">
-                      <input type="number" step="0.01" value={disk.storageMapeado} onChange={e => updateDisk(idx, { storageMapeado: Number(e.target.value) })} className="w-10 bg-transparent text-right outline-none" />
-                    </td>
-                    <td className="p-1 border-r border-slate-100 text-[8px] font-black text-slate-400">TB</td>
-                    <td className="p-1 text-center text-[10px] font-mono text-slate-500">
-                      <input type="number" step="0.01" value={disk.storageEnviado} onChange={e => updateDisk(idx, { storageEnviado: Number(e.target.value) })} className="w-10 bg-transparent text-right outline-none" />
-                    </td>
-                    <td className="p-1 border-r border-slate-100 text-[8px] font-black text-slate-400">TB</td>
-                    <td className="p-2 text-center">
-                      <button 
-                        onClick={() => removeDisk(idx)}
-                        className="p-1 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {editedDisks.length === 0 && (
-                  <tr>
-                    <td colSpan={11} className="p-8 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum disco mapeado</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        {/* Groups and Tables Section */}
+        <div className="lg:col-span-4 space-y-12">
+          {editedGroups.map((group) => (
+            <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-20 backdrop-blur-sm">
+                <div className="flex items-center gap-4 flex-1">
+                  {isEditing ? (
+                    <input 
+                      type="text" 
+                      value={group.title} 
+                      onChange={e => updateGroupTitle(group.id, e.target.value)}
+                      className="bg-white border border-blue-200 rounded px-3 py-1 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-md"
+                    />
+                  ) : (
+                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2">
+                      <HardDrive className="w-4 h-4 text-blue-600" />
+                      {group.title}
+                    </h3>
+                  )}
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group.disks.length} Discos</span>
+                </div>
+                
+                <div className="flex gap-2">
+                  <label className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
+                    <FileUp className="w-3.5 h-3.5" /> Importar
+                    <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
+                  </label>
+                  <button 
+                    onClick={() => addDiskToGroup(group.id)}
+                    className="text-[10px] bg-slate-900 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Disco
+                  </button>
+                  {isEditing && editedGroups.length > 1 && (
+                    <button 
+                      onClick={() => removeGroup(group.id)}
+                      className="text-[10px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remover
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[1000px]">
+                  <thead>
+                    <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <th className="p-4 pl-6 w-[25%]">Origem / Destino</th>
+                      <th className="p-4 text-center w-[12%]">Status</th>
+                      <th className="p-4 text-center w-[10%]">Realizadas</th>
+                      <th className="p-4 text-center w-[10%]">Estudos</th>
+                      <th className="p-4 text-center w-[10%]">Send</th>
+                      <th className="p-4 text-center w-[10%]">Total</th>
+                      <th className="p-4 text-center w-[8%]">Mapeado</th>
+                      <th className="p-4 text-center w-[8%]">Enviado</th>
+                      <th className="p-4 text-right pr-6 w-[7%]">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {group.disks.map((d: Disk, i: number) => (
+                      <tr key={i} className="hover:bg-slate-50/50 transition-colors group/row">
+                        <td className="p-4 pl-6">
+                          <input 
+                            type="text" 
+                            className="w-full bg-transparent text-[11px] font-mono font-bold text-slate-700 outline-none focus:text-blue-600"
+                            value={d.path}
+                            onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
+                          />
+                          {d.destination && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1 rounded uppercase">Destino</span>
+                              <input 
+                                type="text" 
+                                className="flex-1 bg-transparent text-[10px] font-mono text-slate-400 outline-none"
+                                value={d.destination}
+                                onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
+                              />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4 text-center">
+                          <select 
+                            className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${
+                              d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                              d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                              d.status === 'Pausado' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                              'bg-slate-50 text-slate-400 border-slate-100'
+                            }`}
+                            value={d.status}
+                            onChange={e => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
+                          >
+                            <option value="Pendente">Pendente</option>
+                            <option value="Realizando">Execução</option>
+                            <option value="Pausado">Pausado</option>
+                            <option value="Realizado">Finalizado</option>
+                          </select>
+                        </td>
+                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                          <input type="number" className="w-full bg-transparent text-center" value={d.pastasRealizadas} onChange={e => updateDiskInGroup(group.id, i, { pastasRealizadas: Number(e.target.value) })} />
+                        </td>
+                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                          <input type="number" className="w-full bg-transparent text-center" value={d.estudos} onChange={e => updateDiskInGroup(group.id, i, { estudos: Number(e.target.value) })} />
+                        </td>
+                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                          <input type="number" className="w-full bg-transparent text-center" value={d.send} onChange={e => updateDiskInGroup(group.id, i, { send: Number(e.target.value) })} />
+                        </td>
+                        <td className="p-4 text-center text-xs font-mono font-black text-slate-400">
+                          <input type="number" className="w-full bg-transparent text-center" value={d.totalPastas} onChange={e => updateDiskInGroup(group.id, i, { totalPastas: Number(e.target.value) })} />
+                        </td>
+                        <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-400">
+                          <input type="number" step="0.01" className="w-12 bg-transparent text-right" value={d.storageMapeado} onChange={e => updateDiskInGroup(group.id, i, { storageMapeado: Number(e.target.value) })} /> TB
+                        </td>
+                        <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
+                          <input type="number" step="0.01" className="w-12 bg-transparent text-right" value={d.storageEnviado} onChange={e => updateDiskInGroup(group.id, i, { storageEnviado: Number(e.target.value) })} /> TB
+                        </td>
+                        <td className="p-4 text-right pr-6">
+                          <button 
+                            onClick={() => removeDiskFromGroup(group.id, i)}
+                            className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/row:opacity-100"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+          
+          <button 
+            onClick={addGroup}
+            className="w-full py-8 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
+          >
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-all">
+              <Plus className="w-6 h-6" />
+            </div>
+            <span className="text-xs font-black uppercase tracking-widest">Adicionar Nova Unidade / Grupo de Discos</span>
+          </button>
         </div>
       </div>
 
@@ -1127,7 +1540,7 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-[300px]">
         <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight mb-6">Curva de Transferência (Storage)</h3>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={editedDisks}>
+          <AreaChart data={allDisks}>
             <defs>
               <linearGradient id="colorMapeado" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
