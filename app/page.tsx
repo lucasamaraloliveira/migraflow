@@ -148,6 +148,11 @@ function DashboardContent() {
     label: string;
   }>({ show: false, type: 'client', item: null, label: '' });
 
+  const [integrityModal, setIntegrityModal] = useState<{
+    isOpen: boolean;
+    label: string;
+  }>({ isOpen: false, label: '' });
+
   const getClientName = (m: any) => {
     const client = clients.find(c => c.id === m.clientId);
     return client?.name || m.clientName || "Cliente Indefinido";
@@ -156,6 +161,16 @@ function DashboardContent() {
   // Safe Delete Handlers
   const triggerDelete = (type: 'client' | 'migration', id: string, label: string) => {
     const item = type === 'client' ? clients.find(c => c.id === id) : migrations.find(m => m.id === id);
+    
+    // Integrity Check: Prevent deleting client with linked migrations
+    if (type === 'client') {
+      const hasLinkedMigrations = migrations.some(m => m.clientId === id);
+      if (hasLinkedMigrations) {
+        setIntegrityModal({ isOpen: true, label });
+        return;
+      }
+    }
+
     setDeleteConfirm({ isOpen: true, type, id, label, item });
   };
 
@@ -1122,6 +1137,48 @@ function DashboardContent() {
                   className="bg-rose-600 text-white px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-all shadow-lg shadow-rose-900/20 active:scale-95"
                 >
                   Sim, Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Integrity Alert Modal */}
+      <AnimatePresence>
+        {integrityModal.isOpen && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIntegrityModal({ ...integrityModal, isOpen: false })}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200"
+            >
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <AlertCircle className="w-8 h-8 text-amber-600" />
+                </div>
+                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">Bloqueio de Segurança</h2>
+                <p className="text-sm text-slate-500 leading-relaxed font-medium">
+                  Não é possível excluir <span className="text-slate-900 font-bold">{integrityModal.label}</span> porque existem projetos de migração vinculados a este perfil.
+                </p>
+                <div className="mt-4 p-4 bg-slate-50 rounded-2xl text-[10px] text-slate-400 font-black uppercase tracking-widest leading-relaxed">
+                  Dica: Remova ou arquive as migrações deste cliente antes de tentar excluí-lo.
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100">
+                <button 
+                  onClick={() => setIntegrityModal({ ...integrityModal, isOpen: false })}
+                  className="w-full bg-slate-900 text-white px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all active:scale-95 shadow-lg"
+                >
+                  Entendido
                 </button>
               </div>
             </motion.div>
