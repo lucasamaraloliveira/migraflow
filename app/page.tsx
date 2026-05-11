@@ -188,7 +188,7 @@ function DashboardContent() {
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
       {/* Sidebar Navigation */}
-      <aside className={`${isSidebarCollapsed ? 'w-[100px]' : 'w-72'} bg-slate-900 flex flex-col border-r border-slate-800 shadow-2xl z-20 transition-all duration-500 ease-in-out relative`}>
+      <aside className={`hidden md:flex ${isSidebarCollapsed ? 'w-[100px]' : 'w-72'} bg-slate-900 flex-col border-r border-slate-800 shadow-2xl z-20 transition-all duration-500 ease-in-out relative`}>
         <div className="p-6 flex items-center gap-3 border-b border-slate-800 overflow-hidden min-h-[80px]">
           <div className="min-w-[32px] w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shrink-0">M</div>
           {!isSidebarCollapsed && (
@@ -292,16 +292,16 @@ function DashboardContent() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto relative flex flex-col">
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-50 shadow-sm">
-          <div>
-            <h2 className="text-xl font-black text-slate-900 font-display">
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0">
+        <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-6 flex flex-row items-center justify-between sticky top-0 z-10 backdrop-blur-md bg-white/80 gap-4">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm md:text-xl font-black text-slate-900 uppercase tracking-tighter truncate">
               {selectedMigration ? `Detalhamento: ${getClientName(selectedMigration)}` : (
                 activeTab === 'overview' ? 'Painel de Monitoramento' :
                   activeTab === 'clients' ? 'Gestão de Clientes' : 'Projetos de Migração'
               )}
             </h2>
-            <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">
+            <p className="hidden md:block text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">
               {selectedMigration ? 'Análise granular de discos e volumetria' : (
                 activeTab === 'overview' ? 'Migração de Dados e Infraestrutura' :
                   activeTab === 'clients' ? 'Controle de Base de Atendimento' : 'Acompanhamento de Fluxo Crítico'
@@ -309,35 +309,35 @@ function DashboardContent() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             {selectedMigration && (
               <button
                 onClick={() => setSelectedMigrationId(null)}
-                className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-900 px-3 py-2 transition-colors border border-slate-200 rounded-lg"
+                className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-900 px-3 py-2 transition-colors border border-slate-200 rounded-lg flex items-center justify-center whitespace-nowrap"
               >
-                Voltar ao Painel
+                Voltar
               </button>
             )}
             {activeTab === 'clients' && !isGuest && (
               <button
                 onClick={() => setIsClientModalOpen(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm uppercase tracking-tight"
+                className="flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 md:px-6 py-2 md:py-2 rounded-lg md:rounded-md text-[10px] md:text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm uppercase tracking-tight whitespace-nowrap"
               >
-                <Plus className="w-4 h-4" /> Novo Cliente
+                <Plus className="w-3 h-3 md:w-4 md:h-4" /> <span className="hidden sm:inline">Novo</span> Cliente
               </button>
             )}
             {activeTab === 'migrations' && !selectedMigration && !isGuest && (
               <button
                 onClick={() => setIsMigrationModalOpen(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm uppercase tracking-tight"
+                className="flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 md:px-6 py-2 md:py-2 rounded-lg md:rounded-md text-[10px] md:text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm uppercase tracking-tight whitespace-nowrap"
               >
-                <Plus className="w-4 h-4" /> Iniciar Migração
+                <Plus className="w-3 h-3 md:w-4 md:h-4" /> <span className="hidden sm:inline">Nova</span> Migração
               </button>
             )}
           </div>
         </header>
 
-        <div className="p-8">
+        <div className="p-4 md:p-8">
           <AnimatePresence mode="wait">
             {selectedMigration ? (
               <motion.div
@@ -534,7 +534,56 @@ function DashboardContent() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Mobile Card Layout for Clients */}
+                <div className="grid grid-cols-1 gap-4 md:hidden">
+                  {clients.map((client) => (
+                    <div key={client.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-200 transition-all active:scale-[0.98]">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center text-white font-black text-sm">
+                            {client.name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{client.name}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{client.company}</p>
+                          </div>
+                        </div>
+                        {!isGuest && (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                setClientToEdit(client);
+                                setIsClientModalOpen(true);
+                              }}
+                              className="p-2 text-slate-400 hover:text-blue-600 rounded-lg"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteClient(client.id!)}
+                              className="p-2 text-slate-400 hover:text-rose-600 rounded-lg"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1 text-[10px] font-medium text-slate-500 border-t border-slate-50 pt-3">
+                        <div className="flex justify-between">
+                          <span className="uppercase tracking-widest opacity-60">Contato:</span>
+                          <span className="text-slate-900">{client.email}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="uppercase tracking-widest opacity-60">Cadastro:</span>
+                          <span className="text-slate-900">{client.createdAt?.seconds ? format(new Date(client.createdAt.seconds * 1000), 'dd/MM/yyyy') : '...'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View for Clients */}
+                <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <table className="w-full text-left">
                     <thead>
                       <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">
@@ -603,8 +652,78 @@ function DashboardContent() {
                 exit={{ opacity: 0 }}
                 className="grid grid-cols-1 gap-6"
               >
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                  <table className="w-full text-left">
+                {/* Mobile Card Layout for Migrations */}
+                <div className="grid grid-cols-1 gap-4 md:hidden">
+                  {[...migrations].sort((a, b) => {
+                    if (sortOrder === 'none') return 0;
+                    const nameA = getClientName(a).toLowerCase();
+                    const nameB = getClientName(b).toLowerCase();
+                    return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+                  }).map((m) => {
+                    const statusConfig = {
+                      pendente: { color: 'bg-slate-100 text-slate-600', label: 'Pendente' },
+                      em_progresso: { color: 'bg-blue-100 text-blue-600', label: 'Execução' },
+                      pausado: { color: 'bg-amber-100 text-amber-600', label: 'Pausado' },
+                      concluida: { color: 'bg-emerald-100 text-emerald-600', label: 'Concluída' },
+                      atrasada: { color: 'bg-rose-100 text-rose-600', label: 'Atraso' },
+                    }[m.status || 'pendente'] || { color: 'bg-slate-100 text-slate-600', label: 'Pendente' };
+
+                    const allDisks = [...(m.disks || []), ...(m.groups?.flatMap(g => g.disks || []) || [])];
+                    const total = allDisks.reduce((sum, d) => sum + (Number(d.totalPastas) || 0), 0);
+                    const realized = allDisks.reduce((sum, d) => sum + (Number(d.pastasRealizadas) || 0), 0);
+                    const progress = total > 0 ? Math.round((realized / total) * 100) : 0;
+
+                    return (
+                      <div key={m.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm active:scale-[0.98] transition-all" onClick={() => setSelectedMigrationId(m.id!)}>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">{getClientName(m)}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate mt-0.5">{m.description || 'Migração de Dados'}</p>
+                          </div>
+                          <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${statusConfig.color}`}>
+                            {statusConfig.label}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                              <span>Progresso</span>
+                              <span className="text-slate-900">{progress}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} />
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                              📅 {m.endDate || '...'}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedMigrationId(m.id!); }}
+                                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                              >
+                                <HardDrive className="w-3.5 h-3.5" /> Discos
+                              </button>
+                              {!isGuest && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteMigration(m.id!); }}
+                                  className="p-2 text-slate-300 hover:text-rose-600 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View for Migrations */}
+                <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left min-w-[800px] md:min-w-full">
                     <thead>
                       <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">
                         <th className="px-6 py-4">
@@ -619,7 +738,7 @@ function DashboardContent() {
                         <th className="px-6 py-4">Escopo do Projeto</th>
                         <th className="px-6 py-4 text-center">Status</th>
                         <th className="px-6 py-4">Cronograma</th>
-                        <th className="px-6 py-4 text-right pr-12">Dossiê</th>
+                        <th className="px-6 py-4 text-right pr-6">Opções</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -639,7 +758,7 @@ function DashboardContent() {
                               <span className="text-[10px] font-mono text-slate-400 italic">REFSUB-{m.id?.slice(-6)}</span>
                             </button>
                           </td>
-                          <td className="px-6 py-4 max-sm">
+                          <td className="px-6 py-4">
                             <p className="text-xs text-slate-600 leading-relaxed italic">{m.description}</p>
                           </td>
                           <td className="px-6 py-4">
@@ -660,16 +779,20 @@ function DashboardContent() {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-center">
-                            <button
-                              onClick={() => setSelectedMigrationId(m.id!)}
-                              className="text-[10px] font-black text-blue-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 hover:underline transition-all"
-                            >
-                              Analisar Discos
-                            </button>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-center gap-2 text-[10px] font-bold text-slate-500">
+                              <Clock className="w-3 h-3 text-slate-300" />
+                              <span className="uppercase tracking-widest">{m.endDate || '...'}</span>
+                            </div>
                           </td>
                           <td className="px-6 py-4 text-right pr-6">
                             <div className="flex items-center justify-end gap-3">
+                              <button
+                                onClick={() => setSelectedMigrationId(m.id!)}
+                                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md scale-95 hover:scale-100"
+                              >
+                                <HardDrive className="w-3.5 h-3.5" /> Analisar Discos
+                              </button>
                               {!isGuest && (
                                 <button
                                   onClick={() => deleteMigration(m.id!)}
@@ -678,12 +801,6 @@ function DashboardContent() {
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
-                              <button
-                                onClick={() => setSelectedMigrationId(m.id!)}
-                                className="p-2 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-lg transition-all border border-transparent hover:border-blue-100"
-                              >
-                                <ChevronRight className="w-4 h-4" />
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -696,11 +813,11 @@ function DashboardContent() {
           </AnimatePresence>
         </div>
 
-        {/* AI Floating Trigger */}
+        {/* AI Floating Trigger (Desktop Only) */}
         {!isGuest && (
           <button
             onClick={() => setIsChatOpen(true)}
-            className="fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white w-16 h-16 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-110 active:scale-95 group flex flex-col items-center justify-center z-30"
+            className="hidden md:flex fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white w-16 h-16 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-110 active:scale-95 flex-col items-center justify-center z-30 group"
           >
             <div className="relative mb-1">
               <MessageSquare className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
@@ -726,8 +843,62 @@ function DashboardContent() {
         {!isGuest && (
           <AIChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} migrations={migrations} isGuest={isGuest} />
         )}
+
+        {/* Bottom Navigation for Mobile */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-4 py-2 flex items-center justify-around z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
+          <BottomNavLink
+            icon={BarChart3}
+            label="Painel"
+            active={activeTab === 'overview'}
+            onClick={() => { setActiveTab('overview'); setSelectedMigrationId(null); }}
+          />
+          <BottomNavLink
+            icon={Users}
+            label="Clientes"
+            active={activeTab === 'clients'}
+            onClick={() => { setActiveTab('clients'); setSelectedMigrationId(null); }}
+          />
+          <BottomNavLink
+            icon={FileUp}
+            label="Projetos"
+            active={activeTab === 'migrations'}
+            onClick={() => { setActiveTab('migrations'); setSelectedMigrationId(null); }}
+          />
+          {!isGuest && (
+            <BottomNavLink
+              icon={Sparkles}
+              label="IA"
+              active={isChatOpen}
+              onClick={() => setIsChatOpen(true)}
+            />
+          )}
+          <BottomNavLink
+            icon={LogOut}
+            label="Sair"
+            active={false}
+            onClick={() => signOut()}
+          />
+        </nav>
       </main>
     </div>
+  );
+}
+
+function BottomNavLink({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 transition-all duration-300 ${active ? 'text-blue-500 scale-110' : 'text-slate-500'}`}
+    >
+      <Icon className="w-5 h-5" />
+      <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
+      {active && (
+        <motion.div
+          layoutId="activeTabMobile"
+          className="w-1 h-1 bg-blue-500 rounded-full mt-0.5 shadow-[0_0_8px_rgba(37,99,235,0.6)]"
+        />
+      )}
+    </button>
   );
 }
 
@@ -1361,6 +1532,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const [commentText, setCommentText] = useState('');
   const [commentSeverity, setCommentSeverity] = useState<NonNullable<Disk['comment']>['severity']>('sem_prioridade');
   const [copiedInsight, setCopiedInsight] = useState(false);
+  const [hoveredComment, setHoveredComment] = useState<{ text: string, severity: string, x: number, y: number } | null>(null);
 
   useEffect(() => {
     setEditedGroups(migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }]));
@@ -1617,37 +1789,30 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
               <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-0.5">Indicadores de Performance e Volumetria</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {isEditing && (
               <button
                 onClick={handleSave}
-                className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 border border-emerald-500/50"
+                className="bg-emerald-600 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 border border-emerald-500/50"
               >
-                <CheckCircle2 className="w-4 h-4" /> Salvar Alterações
+                <CheckCircle2 className="w-3.5 h-3.5 md:w-4 md:h-4" /> <span className="hidden sm:inline">Salvar</span>
               </button>
             )}
             {!isGuest && (
               <button
                 onClick={generateAISummary}
                 disabled={isGeneratingInsight}
-                className={`flex items-center gap-2 bg-slate-800 text-blue-400 px-4 py-2 rounded-lg hover:bg-slate-700 transition-all text-[10px] font-black uppercase tracking-widest border border-slate-700 shadow-sm ${isGeneratingInsight ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 border border-blue-500/50 disabled:opacity-50"
               >
-                {isGeneratingInsight ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
-                    Gerando...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" /> Gerar Insight IA
-                  </>
-                )}
+                <Sparkles className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isGeneratingInsight ? 'animate-pulse' : ''}`} /> 
+                <span className="hidden sm:inline">{isGeneratingInsight ? 'Gerando...' : 'IA Insight'}</span>
+                {!isGeneratingInsight && <span className="sm:hidden">IA</span>}
               </button>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-slate-100 bg-white">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-y divide-x-0 md:divide-y-0 md:divide-x divide-slate-100 bg-white">
           <div className="p-6 flex flex-col items-center text-center">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Total de Pastas</span>
             <span className="text-2xl font-black text-slate-900 tracking-tighter">{summary.totalPastas.toLocaleString()}</span>
@@ -1695,51 +1860,186 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       <div className="space-y-12">
         {editedGroups.map((group) => (
           <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-              <div className="flex items-center gap-4 flex-1">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-3 flex-1 w-full">
                 {isEditing ? (
                   <input
                     type="text"
                     value={group.title}
                     onChange={e => updateGroupTitle(group.id, e.target.value)}
-                    className="bg-white border border-blue-200 rounded px-3 py-1 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-md"
+                    className="bg-white border border-blue-200 rounded px-3 py-1 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 w-full"
                   />
                 ) : (
-                  <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2">
-                    <HardDrive className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2 truncate">
+                    <HardDrive className="w-4 h-4 text-blue-600 shrink-0" />
                     {group.title}
                   </h3>
                 )}
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group.disks.length} Discos</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest shrink-0">{group.disks.length} Discos</span>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
                 {!isGuest && (
                   <>
-                    <label className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
-                      <FileUp className="w-3.5 h-3.5" /> Importar
+                    <label className="whitespace-nowrap text-[9px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
+                      <FileUp className="w-3 h-3" /> Importar
                       <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
                     </label>
                     <button
                       onClick={() => addDiskToGroup(group.id)}
-                      className="text-[10px] bg-slate-900 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+                      className="whitespace-nowrap text-[9px] bg-slate-900 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm active:scale-95"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Add Disco
+                      <Plus className="w-3 h-3" /> Add Disco
                     </button>
                   </>
                 )}
                 {!isGuest && isEditing && editedGroups.length > 1 && (
                   <button
                     onClick={() => removeGroup(group.id)}
-                    className="text-[10px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
+                    className="whitespace-nowrap text-[9px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
                   >
-                    <Trash2 className="w-3.5 h-3.5" /> Remover
+                    <Trash2 className="w-3 h-3" /> Remover
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Mobile Card Layout for Disks */}
+            <div className="grid grid-cols-1 gap-3 p-4 md:hidden bg-slate-50/30">
+              {group.disks.map((d: Disk, i: number) => (
+                <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        className="w-full bg-transparent text-xs font-mono font-bold text-slate-800 outline-none focus:text-blue-600 border-b border-transparent focus:border-blue-200 pb-1"
+                        value={d.path}
+                        onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
+                      />
+                      {d.destination && (
+                        <div className="flex items-center gap-1.5 mt-2">
+                          <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded uppercase tracking-widest">Destino</span>
+                          <input
+                            type="text"
+                            className="flex-1 bg-transparent text-[10px] font-mono text-slate-500 outline-none truncate"
+                            value={d.destination}
+                            onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <select
+                      value={d.status}
+                      onChange={(e) => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
+                      className={`text-[9px] font-black uppercase tracking-widest rounded-lg px-2 py-1 outline-none border transition-all ${
+                        d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
+                        d.status === 'Pausado' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                        'bg-slate-50 text-slate-400 border-slate-200'
+                      }`}
+                    >
+                      <option value="Pendente">Pendente</option>
+                      <option value="Realizando">Realizando</option>
+                      <option value="Pausado">Pausado</option>
+                      <option value="Realizado">Realizado</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-50">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Realizadas</span>
+                      <NumericInput 
+                        readOnly={isGuest}
+                        value={d.pastasRealizadas}
+                        onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })}
+                        className="w-full text-center text-xs font-black text-emerald-600 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-emerald-200"
+                      />
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Estudos</span>
+                      <NumericInput 
+                        readOnly={isGuest}
+                        value={d.estudos}
+                        onChange={v => updateDiskInGroup(group.id, i, { estudos: v })}
+                        className="w-full text-center text-xs font-black text-slate-900 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
+                      />
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total</span>
+                      <NumericInput 
+                        readOnly={isGuest}
+                        value={d.totalPastas}
+                        onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })}
+                        className="w-full text-center text-xs font-black text-slate-400 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onMouseEnter={(e) => {
+                          if (d.comment) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setHoveredComment({
+                              text: d.comment.text,
+                              severity: d.comment.severity,
+                              x: rect.left,
+                              y: rect.top
+                            });
+                          }
+                        }}
+                        onMouseLeave={() => setHoveredComment(null)}
+                        onClick={() => {
+                          if (isGuest) return;
+                          setCommentModalTarget({ groupId: group.id, diskIdx: i });
+                          setCommentText(d.comment?.text || '');
+                          setCommentSeverity(d.comment?.severity || 'sem_prioridade');
+                          setIsCommentModalOpen(true);
+                        }}
+                        className={`p-2 rounded-xl transition-all ${
+                          d.comment 
+                            ? getSeverityColor(d.comment.severity) 
+                            : 'bg-slate-50 text-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </button>
+                      {!isGuest && (
+                        <button
+                          onClick={() => removeDiskFromGroup(group.id, i)}
+                          className="p-2 bg-rose-50 text-rose-300 hover:text-rose-600 rounded-xl transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className="flex items-center gap-2">
+                        <NumericInput 
+                          isFloat
+                          readOnly={isGuest}
+                          value={d.storageEnviado}
+                          onChange={v => updateDiskInGroup(group.id, i, { storageEnviado: v })}
+                          className="w-12 text-right text-[10px] font-black text-blue-600 bg-transparent outline-none focus:ring-1 focus:ring-blue-100 rounded"
+                        />
+                        <span className="text-[9px] font-bold text-slate-300">/</span>
+                        <NumericInput 
+                          isFloat
+                          readOnly={isGuest}
+                          value={d.storageMapeado}
+                          onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v })}
+                          className="w-12 text-left text-[10px] font-black text-slate-400 bg-transparent outline-none focus:ring-1 focus:ring-slate-100 rounded"
+                        />
+                        <span className="text-[9px] font-black text-slate-400 uppercase">TB</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead>
                   <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -1911,6 +2211,38 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
         </div>
       </div>
       
+      {/* Hover Comment Tooltip */}
+      <AnimatePresence>
+        {hoveredComment && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            style={{ 
+              position: 'fixed', 
+              left: hoveredComment.x, 
+              top: hoveredComment.y - 120, // Position above
+              zIndex: 9999 
+            }}
+            className="w-72 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl pointer-events-none"
+          >
+            <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
+              <div className={`w-2 h-2 rounded-full ${
+                hoveredComment.severity === 'sem_prioridade' ? 'bg-slate-400' :
+                hoveredComment.severity === 'baixa' ? 'bg-blue-500' :
+                hoveredComment.severity === 'media' ? 'bg-amber-500' :
+                hoveredComment.severity === 'alta' ? 'bg-orange-500' : 'bg-rose-500'
+              }`} />
+              <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
+                {hoveredComment.severity.replace('_', ' ')}
+              </span>
+            </div>
+            <p className="text-[11px] leading-relaxed font-medium text-slate-200 whitespace-pre-wrap">{hoveredComment.text}</p>
+            <div className="absolute top-full left-4 w-3 h-3 bg-slate-900 rotate-45 -mt-1.5" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* AI Insight Modal */}
       <AnimatePresence>
         {isInsightModalOpen && aiInsight && (
