@@ -28,7 +28,9 @@ import {
   Edit2,
   User,
   ArrowDownAZ,
-  ArrowUpAZ
+  ArrowUpAZ,
+  Copy,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -1358,6 +1360,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const [commentModalTarget, setCommentModalTarget] = useState<{ groupId: string, diskIdx: number } | null>(null);
   const [commentText, setCommentText] = useState('');
   const [commentSeverity, setCommentSeverity] = useState<NonNullable<Disk['comment']>['severity']>('sem_prioridade');
+  const [copiedInsight, setCopiedInsight] = useState(false);
 
   useEffect(() => {
     setEditedGroups(migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }]));
@@ -1457,6 +1460,17 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       case 'alta': return 'bg-orange-50 text-orange-600 border border-orange-100';
       case 'urgente': return 'bg-rose-50 text-rose-600 border border-rose-100';
       default: return 'bg-slate-50 text-slate-400';
+    }
+  };
+
+  const copyInsight = async () => {
+    if (!aiInsight) return;
+    try {
+      await navigator.clipboard.writeText(aiInsight);
+      setCopiedInsight(true);
+      setTimeout(() => setCopiedInsight(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy insight:', err);
     }
   };
 
@@ -1974,7 +1988,25 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                 </div>
               </div>
               
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={copyInsight}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border ${
+                    copiedInsight 
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {copiedInsight ? (
+                    <>
+                      <Check className="w-4 h-4" /> Copiado!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" /> Copiar Relatório
+                    </>
+                  )}
+                </button>
                 <button 
                   onClick={() => setIsInsightModalOpen(false)}
                   className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-lg active:scale-95"
