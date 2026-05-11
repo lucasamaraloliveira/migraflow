@@ -1681,6 +1681,12 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const [copiedInsight, setCopiedInsight] = useState(false);
   const [hoveredComment, setHoveredComment] = useState<{ text: string, severity: string, x: number, y: number } | null>(null);
 
+  // Security: Delete Confirmation & Undo
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ groupId: string, diskIdx: number } | null>(null);
+  const [lastDeletedDisk, setLastDeletedDisk] = useState<{ groupId: string, disk: Disk, idx: number } | null>(null);
+  const [showUndoToast, setShowUndoToast] = useState(false);
+
   useEffect(() => {
     setEditedGroups(migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }]));
   }, [migration.groups, migration.disks]);
@@ -1762,13 +1768,54 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
     setIsEditing(true);
   };
 
-  const removeDiskFromGroup = (groupId: string, diskIdx: number) => {
+  const askRemoveDisk = (groupId: string, diskIdx: number) => {
     if (isGuest) return;
+    setDeleteTarget({ groupId, diskIdx });
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmRemoveDisk = () => {
+    if (!deleteTarget || isGuest) return;
+    const { groupId, diskIdx } = deleteTarget;
+    
+    const group = editedGroups.find(g => g.id === groupId);
+    if (!group) return;
+    
+    const diskToDelete = group.disks[diskIdx];
+    
+    // Save for undo
+    setLastDeletedDisk({ groupId, disk: diskToDelete, idx: diskIdx });
+    
+    // Remove
     setEditedGroups(editedGroups.map(g => g.id === groupId ? {
       ...g,
       disks: g.disks.filter((_: Disk, i: number) => i !== diskIdx)
     } : g));
+    
     setIsEditing(true);
+    setIsDeleteConfirmOpen(false);
+    setDeleteTarget(null);
+    
+    // Show undo toast
+    setShowUndoToast(true);
+    setTimeout(() => setShowUndoToast(false), 8000); // 8 seconds to undo
+  };
+
+  const undoDelete = () => {
+    if (!lastDeletedDisk || isGuest) return;
+    const { groupId, disk, idx } = lastDeletedDisk;
+    
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+      ...g,
+      disks: [...g.disks.slice(0, idx), disk, ...g.disks.slice(idx)]
+    } : g));
+    
+    setLastDeletedDisk(null);
+    setShowUndoToast(false);
+  };
+
+  const removeDiskFromGroup = (groupId: string, diskIdx: number) => {
+    askRemoveDisk(groupId, diskIdx);
   };
 
   const updateDiskInGroup = (groupId: string, diskIdx: number, data: Partial<Disk>) => {
@@ -2721,6 +2768,79 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                   className="flex-1 bg-blue-600 text-white py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-all shadow-lg active:scale-95"
                 >
                   Salvar Comentário
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Undo Toast */}
+      <AnimatePresence>
+        {showUndoToast && lastDeletedDisk && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-slate-800 min-w-[320px] md:min-w-[400px]"
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <div className="p-2 bg-rose-500/20 rounded-lg">
+                <Trash2 className="w-4 h-4 text-rose-400" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-white">Disco Excluído</p>
+                <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">{lastDeletedDisk.disk.path || 'Sem caminho'}</p>
+              </div>
+            </div>
+            <button 
+              onClick={undoDelete}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-blue-900/40"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Desfazer
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {isDeleteConfirmOpen && (
+          <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDeleteConfirmOpen(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200"
+            >
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Trash2 className="w-8 h-8 text-rose-600" />
+                </div>
+                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">Excluir Disco?</h2>
+                <p className="text-sm text-slate-500 leading-relaxed font-medium">
+                  Esta ação removerá o disco e todas as métricas associadas. Deseja continuar?
+                </p>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  className="bg-white text-slate-600 px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs border border-slate-200 hover:bg-slate-100 transition-all active:scale-95"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={confirmRemoveDisk}
+                  className="bg-rose-600 text-white px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-all shadow-lg shadow-rose-900/20 active:scale-95"
+                >
+                  Sim, Excluir
                 </button>
               </div>
             </motion.div>
