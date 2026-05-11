@@ -74,7 +74,7 @@ export interface Client {
 
 export interface Disk {
   path: string;
-  status: 'Realizado' | 'Realizando' | 'Pendente' | 'Pausado';
+  status: 'Realizado' | 'Realizando' | 'Pendente' | 'Pausado' | 'Reprocessamento de Erros';
   pastasRealizadas: number;
   estudos: number;
   send: number;

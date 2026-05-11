@@ -2071,13 +2071,15 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                         className={`text-[9px] font-black uppercase tracking-widest rounded-lg px-2 py-1 outline-none border transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                           d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
                             d.status === 'Pausado' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                              'bg-slate-50 text-slate-400 border-slate-200'
+                              d.status === 'Reprocessamento de Erros' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                                'bg-slate-50 text-slate-400 border-slate-200'
                           }`}
                       >
                         <option value="Pendente">Pendente</option>
                         <option value="Realizando">Realizando</option>
                         <option value="Pausado">Pausado</option>
                         <option value="Realizado">Realizado</option>
+                        <option value="Reprocessamento de Erros">Reprocessamento de Erros</option>
                       </select>
                     </div>
 
@@ -2242,7 +2244,8 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                             className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                               d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                                 d.status === 'Pausado' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                  'bg-slate-50 text-slate-400 border-slate-100'
+                                  d.status === 'Reprocessamento de Erros' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                                    'bg-slate-50 text-slate-400 border-slate-100'
                               }`}
                             value={d.status}
                             onChange={e => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
@@ -2251,6 +2254,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                             <option value="Realizando">Execução</option>
                             <option value="Pausado">Pausado</option>
                             <option value="Realizado">Finalizado</option>
+                            <option value="Reprocessamento de Erros">Reprocessamento</option>
                           </select>
                         </td>
                         <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
