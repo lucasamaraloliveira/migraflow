@@ -69,6 +69,7 @@ export interface Client {
   name: string;
   email: string;
   company: string;
+  description?: string;
   createdAt: any;
 }
 
