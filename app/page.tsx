@@ -318,7 +318,7 @@ function DashboardContent() {
             <h2 className="text-sm md:text-xl font-black text-slate-900 uppercase tracking-tighter truncate">
               {selectedMigration ? `Detalhamento: ${getClientName(selectedMigration)}` : (
                 activeTab === 'overview' ? 'Painel de Monitoramento' :
-                  activeTab === 'clients' ? 'Gestão de Clientes' : 'Projetos de Migração'
+                  activeTab === 'clients' ? 'Gestão de Clientes' : 'Migrações'
               )}
             </h2>
             <p className="hidden md:block text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">
@@ -915,7 +915,7 @@ function DashboardContent() {
           />
           <BottomNavLink
             icon={FileUp}
-            label="Projetos"
+            label="Migrações"
             active={activeTab === 'migrations'}
             onClick={() => { setActiveTab('migrations'); setSelectedMigrationId(null); }}
           />
