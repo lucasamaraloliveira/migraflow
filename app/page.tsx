@@ -25,7 +25,10 @@ import {
   Trash2,
   Settings2,
   Sparkles,
-  Edit2
+  Edit2,
+  User,
+  ArrowDownAZ,
+  ArrowUpAZ
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -65,7 +68,7 @@ function NumericInput({ value, onChange, isFloat = false, className, readOnly, p
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (readOnly) return;
     const raw = e.target.value;
-    
+
     if (isFloat) {
       const clean = raw.replace(/[^\d,]/g, '');
       setDisplay(clean);
@@ -122,6 +125,7 @@ function DashboardContent() {
   const [selectedMigrationId, setSelectedMigrationId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
 
   const getClientName = (m: any) => {
     const client = clients.find(c => c.id === m.clientId);
@@ -141,12 +145,12 @@ function DashboardContent() {
   const aggregatedData = migrations.reduce((acc: any, m) => {
     const rawName = getClientName(m);
     const clientName = rawName ? rawName.trim() : "Cliente Indefinido";
-    
+
     const allDisks = [
       ...(m.disks || []),
       ...(m.groups?.flatMap(g => g.disks || []) || [])
     ];
-    
+
     const studies = allDisks.reduce((sum, d) => sum + (Number(d.estudos) || 0), 0);
     // Sum totalPastas, but if not available, sum pastasRealizadas to ensure SOMETHING shows up if data exists
     const folders = allDisks.reduce((sum, d) => {
@@ -159,11 +163,11 @@ function DashboardContent() {
     if (!acc[clientName]) {
       acc[clientName] = { name: clientName, estudos: 0, pastas: 0, volume: 0 };
     }
-    
+
     acc[clientName].estudos += studies;
     acc[clientName].pastas += folders;
     acc[clientName].volume += volume;
-    
+
     return acc;
   }, {});
 
@@ -234,9 +238,8 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className={`absolute bottom-full mb-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-30 ${
-                  isSidebarCollapsed ? 'left-4 w-48' : 'left-4 right-4'
-                }`}
+                className={`absolute bottom-full mb-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-30 ${isSidebarCollapsed ? 'left-4 w-48' : 'left-4 right-4'
+                  }`}
               >
                 <div className="p-3 border-b border-slate-700 flex flex-col bg-slate-900/50">
                   <span className="text-[10px] font-black text-white uppercase tracking-wider truncate">{user?.displayName}</span>
@@ -253,11 +256,10 @@ function DashboardContent() {
             )}
           </AnimatePresence>
 
-          <button 
+          <button
             onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-            className={`flex items-center transition-all duration-300 w-full rounded-2xl p-2 ${
-              isSidebarCollapsed ? 'justify-center' : 'gap-4 px-3'
-            } ${isProfileMenuOpen ? 'bg-slate-800 shadow-inner' : 'hover:bg-slate-800/50'}`}
+            className={`flex items-center transition-all duration-300 w-full rounded-2xl p-2 ${isSidebarCollapsed ? 'justify-center' : 'gap-4 px-3'
+              } ${isProfileMenuOpen ? 'bg-slate-800 shadow-inner' : 'hover:bg-slate-800/50'}`}
           >
             <div className="relative shrink-0">
               {user?.photoURL ? (
@@ -276,7 +278,7 @@ function DashboardContent() {
               )}
               <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
             </div>
-            
+
             {!isSidebarCollapsed && (
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-[10px] font-black truncate text-white uppercase tracking-wider">{user?.displayName}</p>
@@ -383,21 +385,21 @@ function DashboardContent() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData} margin={{ bottom: 40 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                          <XAxis 
-                            dataKey="name" 
-                            fontSize={10} 
-                            stroke="#94a3b8" 
-                            interval={0} 
-                            angle={-15} 
-                            textAnchor="end" 
+                          <XAxis
+                            dataKey="name"
+                            fontSize={10}
+                            stroke="#94a3b8"
+                            interval={0}
+                            angle={-15}
+                            textAnchor="end"
                             height={60}
                           />
                           <YAxis fontSize={10} stroke="#94a3b8" />
                           <Tooltip
                             formatter={(value: any, name: any) => {
-                              const label = name === 'volume' ? 'Volume' : 
-                                            name === 'estudos' ? 'Estudos' : 
-                                            name === 'pastas' ? 'Pastas' : name;
+                              const label = name === 'volume' ? 'Volume' :
+                                name === 'estudos' ? 'Estudos' :
+                                  name === 'pastas' ? 'Pastas' : name;
                               const unit = name === 'volume' ? ' TB' : '';
                               return [`${value?.toLocaleString() || '0'}${unit}`, label];
                             }}
@@ -478,7 +480,7 @@ function DashboardContent() {
                                 <StatusBadge status={m.status} />
                               </td>
                               <td className="p-4 text-right pr-6">
-                                <button 
+                                <button
                                   onClick={() => setSelectedMigrationId(m.id || null)}
                                   className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 group-hover:text-blue-600 transition-all"
                                 >
@@ -603,7 +605,15 @@ function DashboardContent() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">
-                        <th className="px-6 py-4">Identificação</th>
+                        <th className="px-6 py-4">
+                          <button 
+                            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                            className="flex items-center gap-2 hover:text-white transition-colors"
+                          >
+                            Identificação
+                            {sortOrder === 'asc' ? <ArrowUpAZ className="w-4 h-4 text-blue-500" /> : <ArrowDownAZ className="w-4 h-4" />}
+                          </button>
+                        </th>
                         <th className="px-6 py-4">Escopo do Projeto</th>
                         <th className="px-6 py-4 text-center">Status</th>
                         <th className="px-6 py-4">Cronograma</th>
@@ -611,7 +621,12 @@ function DashboardContent() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {migrations.map((m) => (
+                      {[...migrations].sort((a, b) => {
+                        if (sortOrder === 'none') return 0;
+                        const nameA = getClientName(a).toLowerCase();
+                        const nameB = getClientName(b).toLowerCase();
+                        return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+                      }).map((m) => (
                         <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
                           <td className="px-6 py-4">
                             <button
@@ -715,15 +730,15 @@ function SidebarLink({ icon: Icon, label, active, onClick, isCollapsed }: { icon
     <button
       onClick={onClick}
       className={`flex items-center w-full rounded-xl transition-all duration-300 border group relative ${active
-          ? 'bg-blue-600/10 text-blue-400 border-blue-500/20 shadow-[inset_0_0_12px_rgba(37,99,235,0.05)]'
-          : 'text-slate-500 border-transparent hover:bg-slate-800/40 hover:text-slate-200'
+        ? 'bg-blue-600/10 text-blue-400 border-blue-500/20 shadow-[inset_0_0_12px_rgba(37,99,235,0.05)]'
+        : 'text-slate-500 border-transparent hover:bg-slate-800/40 hover:text-slate-200'
         } ${isCollapsed ? 'flex-col justify-center py-4 px-1 gap-2' : 'px-5 py-3 gap-4'}`}
     >
       <Icon className={`${isCollapsed ? 'w-6 h-6' : 'w-5 h-5'} shrink-0 transition-transform duration-300 ${active ? 'text-blue-500 scale-110' : 'text-slate-500 group-hover:text-slate-200 group-hover:scale-110'}`} />
 
       <span className={`font-black uppercase transition-all duration-300 ${isCollapsed
-          ? 'text-[9px] leading-tight tracking-tight text-center'
-          : `text-xs tracking-[0.15em] whitespace-nowrap ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`
+        ? 'text-[9px] leading-tight tracking-tight text-center'
+        : `text-xs tracking-[0.15em] whitespace-nowrap ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`
         }`}>
         {label}
       </span>
@@ -1071,7 +1086,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd, isGuest }: { isOpen: 
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Configuração de Unidades e Discos</label>
               {!isGuest && (
-                <button 
+                <button
                   onClick={addGroup}
                   className="text-[10px] bg-slate-900 text-white px-4 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm"
                 >
@@ -1084,8 +1099,8 @@ function MigrationModal({ isOpen, onClose, clients, onAdd, isGuest }: { isOpen: 
               {formData.groups.map((group) => (
                 <div key={group.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
                   <div className="flex justify-between items-center gap-4">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       disabled={isGuest}
                       className="flex-1 bg-white border border-slate-200 rounded-lg p-2 text-xs font-black uppercase tracking-tight outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50"
                       value={group.title}
@@ -1099,7 +1114,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd, isGuest }: { isOpen: 
                             <FileUp className="w-3.5 h-3.5" /> Importar
                             <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
                           </label>
-                          <button 
+                          <button
                             onClick={() => addDiskToGroup(group.id)}
                             className="text-[10px] bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
                           >
@@ -1195,7 +1210,7 @@ function AIChatDrawer({ isOpen, onClose, migrations, isGuest }: { isOpen: boolea
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, model: "gemini-1.5-flash" })
+        body: JSON.stringify({ prompt, model: "gemini-3.1-flash-lite-preview" })
       });
 
       const data = await res.json();
@@ -1216,18 +1231,11 @@ function AIChatDrawer({ isOpen, onClose, migrations, isGuest }: { isOpen: boolea
       {isOpen && (
         <>
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-40"
-          />
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 40, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 shadow-2xl z-50 flex flex-col border-l border-slate-800 text-white"
+            className="fixed bottom-32 right-8 w-[400px] h-[650px] max-h-[calc(100vh-160px)] bg-slate-900 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] z-50 flex flex-col border border-slate-700/50 rounded-[32px] overflow-hidden text-white ring-1 ring-white/10"
           >
             <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50 backdrop-blur-xl">
               <div className="flex items-center gap-3">
@@ -1248,13 +1256,39 @@ function AIChatDrawer({ isOpen, onClose, migrations, isGuest }: { isOpen: boolea
               </div>
 
               {messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-4 rounded-xl text-[13px] leading-relaxed shadow-lg ${m.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-tr-none font-medium'
-                      : 'bg-slate-800/60 text-slate-200 rounded-tl-none border border-slate-800'
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2`}>
+                  {m.role === 'assistant' && (
+                    <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0 mt-1">
+                      <Sparkles className="w-4 h-4 text-blue-400" />
+                    </div>
+                  )}
+                  <div className={`max-w-[85%] p-4 rounded-2xl text-[12px] leading-relaxed shadow-xl transition-all ${m.role === 'user'
+                    ? 'bg-blue-600 text-white rounded-tr-none font-medium'
+                    : 'bg-slate-900/90 text-slate-200 rounded-tl-none border border-slate-800 backdrop-blur-md shadow-blue-900/5'
                     }`}>
-                    {m.content}
+                    {m.role === 'assistant' ? (
+                      <div className="space-y-2">
+                        {m.content.split('\n').map((line, li) => (
+                          <p key={li}>
+                            {line.split(/(\*\*.*?\*\*|`.*?`)/).map((part, pi) => {
+                              if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={pi} className="text-blue-400 font-black tracking-tight">{part.slice(2, -2)}</strong>;
+                              }
+                              if (part.startsWith('`') && part.endsWith('`')) {
+                                return <code key={pi} className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-blue-300 font-mono text-[10px]">{part.slice(1, -1)}</code>;
+                              }
+                              return part;
+                            })}
+                          </p>
+                        ))}
+                      </div>
+                    ) : m.content}
                   </div>
+                  {m.role === 'user' && (
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 mt-1">
+                      <User className="w-4 h-4 text-slate-400" />
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -1311,6 +1345,19 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const [editedGroups, setEditedGroups] = useState<DiskGroup[]>(
     migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }])
   );
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
+  const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
+  
+  // Comment Modal State
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [commentModalTarget, setCommentModalTarget] = useState<{ groupId: string, diskIdx: number } | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [commentSeverity, setCommentSeverity] = useState<NonNullable<Disk['comment']>['severity']>('sem_prioridade');
+
+  useEffect(() => {
+    setEditedGroups(migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }]));
+  }, [migration.groups, migration.disks]);
 
   const parseNum = (val: any) => {
     if (typeof val === 'number') return val;
@@ -1384,6 +1431,29 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       disks: g.disks.map((d: Disk, i: number) => i === diskIdx ? { ...d, ...data } : d)
     } : g));
     setIsEditing(true);
+  };
+
+  const saveComment = () => {
+    if (!commentModalTarget || isGuest) return;
+    updateDiskInGroup(commentModalTarget.groupId, commentModalTarget.diskIdx, {
+      comment: {
+        text: commentText,
+        severity: commentSeverity as any
+      }
+    });
+    setIsCommentModalOpen(false);
+    setCommentModalTarget(null);
+  };
+
+  const getSeverityColor = (sev: NonNullable<Disk['comment']>['severity']) => {
+    switch (sev) {
+      case 'sem_prioridade': return 'bg-slate-900 text-white';
+      case 'baixa': return 'bg-blue-50 text-blue-600 border border-blue-100';
+      case 'media': return 'bg-amber-50 text-amber-600 border border-amber-100';
+      case 'alta': return 'bg-orange-50 text-orange-600 border border-orange-100';
+      case 'urgente': return 'bg-rose-50 text-rose-600 border border-rose-100';
+      default: return 'bg-slate-50 text-slate-400';
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, groupId: string) => {
@@ -1481,24 +1551,37 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
   const generateAISummary = async () => {
     if (isGuest) return;
+    setIsGeneratingInsight(true);
     try {
-      const diskContext = allDisks.map(d => `- Caminho: ${d.path}, Status: ${d.status}, Pastas: ${d.pastasRealizadas}/${d.totalPastas}, Storage: ${d.storageEnviado}/${d.storageMapeado} TB`).join('\n');
-      const prompt = `Gere um resumo executivo técnico curto (máximo 4 parágrafos) para a migração do cliente ${migration.clientName}. 
-      Contexto dos discos:\n${diskContext}\n
-      Destaque o progresso total (${summary.progresso}%), gargalos e recomendações. Use um tom profissional e direto.`;
+      const diskContext = allDisks.map(d => {
+        let ctx = `- Caminho: ${d.path}, Status: ${d.status}, Pastas: ${d.pastasRealizadas}/${d.totalPastas}, Storage: ${d.storageEnviado}/${d.storageMapeado} TB`;
+        if (d.comment) {
+          ctx += ` | COMENTÁRIO TÉCNICO: [${d.comment.severity.toUpperCase()}] ${d.comment.text}`;
+        }
+        return ctx;
+      }).join('\n');
+      
+      const prompt = `Gere um resumo executivo técnico conciso e elegante para a migração do cliente ${migration.clientName}. 
+      Contexto dos discos e observações técnicas:\n${diskContext}\n
+      Destaque o progresso total (${summary.progresso}%), identifique gargalos potenciais (especialmente aqueles marcados com alta prioridade ou urgente) e forneça recomendações estratégicas baseadas nos comentários técnicos. 
+      Use markdown para formatação (**negrito**, listas, etc). Seja direto e profissional.`;
 
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, model: "gemini-1.5-flash" })
+        body: JSON.stringify({ prompt, model: "gemini-3.1-flash-lite-preview" })
       });
 
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      alert("Resumo gerado:\n\n" + data.text);
+      
+      setAiInsight(data.text);
+      setIsInsightModalOpen(true);
     } catch (error) {
       console.error("AI Error:", error);
-      alert("Erro ao gerar resumo via IA.");
+      alert("Erro ao conectar com o subsistema de IA.");
+    } finally {
+      setIsGeneratingInsight(false);
     }
   };
 
@@ -1517,23 +1600,33 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
             </div>
           </div>
           <div className="flex items-center gap-3">
-             {isEditing && (
-                <button
-                  onClick={handleSave}
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 border border-emerald-500/50"
-                >
-                  <CheckCircle2 className="w-4 h-4" /> Salvar Alterações
-                </button>
-             )}
-             <button 
-               onClick={generateAISummary}
-               className="flex items-center gap-2 bg-slate-800 text-blue-400 px-4 py-2 rounded-lg hover:bg-slate-700 transition-all text-[10px] font-black uppercase tracking-widest border border-slate-700 shadow-sm"
-             >
-               <Sparkles className="w-4 h-4" /> Gerar Insight IA
-             </button>
+            {isEditing && (
+              <button
+                onClick={handleSave}
+                className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 border border-emerald-500/50"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Salvar Alterações
+              </button>
+            )}
+            <button
+              onClick={generateAISummary}
+              disabled={isGeneratingInsight}
+              className={`flex items-center gap-2 bg-slate-800 text-blue-400 px-4 py-2 rounded-lg hover:bg-slate-700 transition-all text-[10px] font-black uppercase tracking-widest border border-slate-700 shadow-sm ${isGeneratingInsight ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isGeneratingInsight ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" /> Gerar Insight IA
+                </>
+              )}
+            </button>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-slate-100 bg-white">
           <div className="p-6 flex flex-col items-center text-center">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Total de Pastas</span>
@@ -1558,13 +1651,13 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
           <div className="p-6 flex flex-col items-center justify-center bg-slate-50/50">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Progresso Total</span>
             <div className="flex items-center gap-3">
-               <span className="text-3xl font-black text-blue-600 tracking-tighter">{summary.progresso}%</span>
-               <div className="w-12 h-12 relative">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                    <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-200" strokeWidth="4" />
-                    <circle cx="18" cy="18" r="16" fill="none" className="stroke-blue-600 transition-all duration-1000" strokeWidth="4" strokeDasharray={`${summary.progresso}, 100`} strokeLinecap="round" />
-                  </svg>
-               </div>
+              <span className="text-3xl font-black text-blue-600 tracking-tighter">{summary.progresso}%</span>
+              <div className="w-12 h-12 relative">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-200" strokeWidth="4" />
+                  <circle cx="18" cy="18" r="16" fill="none" className="stroke-blue-600 transition-all duration-1000" strokeWidth="4" strokeDasharray={`${summary.progresso}, 100`} strokeLinecap="round" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
@@ -1572,188 +1665,402 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
       {/* Groups and Tables Section */}
       <div className="space-y-12">
-          {editedGroups.map((group) => (
-            <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                <div className="flex items-center gap-4 flex-1">
-                  {isEditing ? (
-                    <input 
-                      type="text" 
-                      value={group.title} 
-                      onChange={e => updateGroupTitle(group.id, e.target.value)}
-                      className="bg-white border border-blue-200 rounded px-3 py-1 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-md"
-                    />
-                  ) : (
-                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2">
-                      <HardDrive className="w-4 h-4 text-blue-600" />
-                      {group.title}
-                    </h3>
-                  )}
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group.disks.length} Discos</span>
-                </div>
-                
-                <div className="flex gap-2">
-                  {!isGuest && (
-                    <>
-                      <label className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
-                        <FileUp className="w-3.5 h-3.5" /> Importar
-                        <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
-                      </label>
-                      <button 
-                        onClick={() => addDiskToGroup(group.id)}
-                        className="text-[10px] bg-slate-900 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Add Disco
-                      </button>
-                    </>
-                  )}
-                  {!isGuest && isEditing && editedGroups.length > 1 && (
-                    <button 
-                      onClick={() => removeGroup(group.id)}
-                      className="text-[10px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Remover
-                    </button>
-                  )}
-                </div>
+        {editedGroups.map((group) => (
+          <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <div className="flex items-center gap-4 flex-1">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={group.title}
+                    onChange={e => updateGroupTitle(group.id, e.target.value)}
+                    className="bg-white border border-blue-200 rounded px-3 py-1 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-md"
+                  />
+                ) : (
+                  <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-blue-600" />
+                    {group.title}
+                  </h3>
+                )}
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group.disks.length} Discos</span>
               </div>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1000px]">
-                  <thead>
-                    <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <th className="p-4 pl-6 w-[25%]">Origem / Destino</th>
-                      <th className="p-4 text-center w-[12%]">Status</th>
-                      <th className="p-4 text-center w-[10%]">Realizadas</th>
-                      <th className="p-4 text-center w-[10%]">Estudos</th>
-                      <th className="p-4 text-center w-[10%]">Send</th>
-                      <th className="p-4 text-center w-[10%]">Total</th>
-                      <th className="p-4 text-center w-[8%]">Mapeado</th>
-                      <th className="p-4 text-center w-[8%]">Enviado</th>
-                      <th className="p-4 text-right pr-6 w-[7%]">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {group.disks.map((d: Disk, i: number) => (
-                      <tr key={i} className="hover:bg-slate-50/50 transition-colors group/row">
-                        <td className="p-4 pl-6">
-                          <input 
-                            type="text" 
-                            className="w-full bg-transparent text-[11px] font-mono font-bold text-slate-700 outline-none focus:text-blue-600"
-                            value={d.path}
-                            onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
-                          />
-                          {d.destination && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1 rounded uppercase">Destino</span>
-                              <input 
-                                type="text" 
-                                className="flex-1 bg-transparent text-[10px] font-mono text-slate-400 outline-none"
-                                value={d.destination}
-                                onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
-                              />
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-4 text-center">
-                          <select 
-                            disabled={isGuest}
-                            className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${
-                              d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                              d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+
+              <div className="flex gap-2">
+                {!isGuest && (
+                  <>
+                    <label className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
+                      <FileUp className="w-3.5 h-3.5" /> Importar
+                      <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
+                    </label>
+                    <button
+                      onClick={() => addDiskToGroup(group.id)}
+                      className="text-[10px] bg-slate-900 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Disco
+                    </button>
+                  </>
+                )}
+                {!isGuest && isEditing && editedGroups.length > 1 && (
+                  <button
+                    onClick={() => removeGroup(group.id)}
+                    className="text-[10px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Remover
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead>
+                  <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <th className="p-4 pl-6 w-[25%]">Origem / Destino</th>
+                    <th className="p-4 text-center w-[12%]">Status</th>
+                    <th className="p-4 text-center w-[10%]">Realizadas</th>
+                    <th className="p-4 text-center w-[10%]">Estudos</th>
+                    <th className="p-4 text-center w-[10%]">Send</th>
+                    <th className="p-4 text-center w-[10%]">Total</th>
+                    <th className="p-4 text-center w-[8%]">Mapeado</th>
+                    <th className="p-4 text-center w-[8%]">Enviado</th>
+                    <th className="p-4 text-right pr-6 w-[7%]">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {group.disks.map((d: Disk, i: number) => (
+                    <tr key={i} className="hover:bg-slate-50/50 transition-colors group/row">
+                      <td className="p-4 pl-6">
+                        <input
+                          type="text"
+                          className="w-full bg-transparent text-[11px] font-mono font-bold text-slate-700 outline-none focus:text-blue-600"
+                          value={d.path}
+                          onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
+                        />
+                        {d.destination && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1 rounded uppercase">Destino</span>
+                            <input
+                              type="text"
+                              className="flex-1 bg-transparent text-[10px] font-mono text-slate-400 outline-none"
+                              value={d.destination}
+                              onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
+                            />
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-center">
+                        <select
+                          disabled={isGuest}
+                          className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                            d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                               d.status === 'Pausado' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                              'bg-slate-50 text-slate-400 border-slate-100'
+                                'bg-slate-50 text-slate-400 border-slate-100'
                             }`}
-                            value={d.status}
-                            onChange={e => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
-                          >
-                            <option value="Pendente">Pendente</option>
-                            <option value="Realizando">Execução</option>
-                            <option value="Pausado">Pausado</option>
-                            <option value="Realizado">Finalizado</option>
-                          </select>
-                        </td>
-                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.pastasRealizadas} onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })} />
-                        </td>
-                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.estudos} onChange={v => updateDiskInGroup(group.id, i, { estudos: v })} />
-                        </td>
-                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.send} onChange={v => updateDiskInGroup(group.id, i, { send: v })} />
-                        </td>
-                        <td className="p-4 text-center text-xs font-mono font-black text-slate-400">
-                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.totalPastas} onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })} />
-                        </td>
-                        <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-400">
-                          <div className="flex items-center justify-end gap-1">
-                            <NumericInput isFloat readOnly={isGuest} className="w-12 bg-transparent text-right outline-none" value={d.storageMapeado} onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v })} />
-                            <span>TB</span>
+                          value={d.status}
+                          onChange={e => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
+                        >
+                          <option value="Pendente">Pendente</option>
+                          <option value="Realizando">Execução</option>
+                          <option value="Pausado">Pausado</option>
+                          <option value="Realizado">Finalizado</option>
+                        </select>
+                      </td>
+                      <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                        <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.pastasRealizadas} onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })} />
+                      </td>
+                      <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                        <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.estudos} onChange={v => updateDiskInGroup(group.id, i, { estudos: v })} />
+                      </td>
+                      <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                        <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.send} onChange={v => updateDiskInGroup(group.id, i, { send: v })} />
+                      </td>
+                      <td className="p-4 text-center text-xs font-mono font-black text-slate-400">
+                        <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.totalPastas} onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })} />
+                      </td>
+                      <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-400">
+                        <div className="flex items-center justify-end gap-1">
+                          <NumericInput isFloat readOnly={isGuest} className="w-12 bg-transparent text-right outline-none" value={d.storageMapeado} onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v })} />
+                          <span>TB</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
+                        <div className="flex items-center justify-end gap-1">
+                          <NumericInput isFloat readOnly={isGuest} className="w-12 bg-transparent text-right outline-none" value={d.storageEnviado} onChange={v => updateDiskInGroup(group.id, i, { storageEnviado: v })} />
+                          <span>TB</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right pr-6">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="relative group/tooltip">
+                            <button
+                              onClick={() => {
+                                setCommentModalTarget({ groupId: group.id, diskIdx: i });
+                                setCommentText(d.comment?.text || '');
+                                setCommentSeverity(d.comment?.severity || 'sem_prioridade');
+                                setIsCommentModalOpen(true);
+                              }}
+                              className={`p-1.5 rounded-lg transition-all ${d.comment ? getSeverityColor(d.comment.severity) : 'text-slate-300 hover:text-blue-600 hover:bg-blue-50'}`}
+                              title="Comentário Técnico"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </button>
+                            {d.comment?.text && (
+                              <div className="absolute bottom-full right-0 mb-3 w-72 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none translate-y-2 group-hover/tooltip:translate-y-0">
+                                <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    d.comment.severity === 'sem_prioridade' ? 'bg-slate-400' :
+                                    d.comment.severity === 'baixa' ? 'bg-blue-500' :
+                                    d.comment.severity === 'media' ? 'bg-amber-500' :
+                                    d.comment.severity === 'alta' ? 'bg-orange-500' : 'bg-rose-500'
+                                  }`} />
+                                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
+                                    {d.comment.severity.replace('_', ' ')}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] leading-relaxed font-medium text-slate-200 whitespace-pre-wrap">{d.comment.text}</p>
+                                <div className="absolute top-full right-4 w-3 h-3 bg-slate-900 rotate-45 -mt-1.5" />
+                              </div>
+                            )}
                           </div>
-                        </td>
-                        <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
-                          <div className="flex items-center justify-end gap-1">
-                            <NumericInput isFloat readOnly={isGuest} className="w-12 bg-transparent text-right outline-none" value={d.storageEnviado} onChange={v => updateDiskInGroup(group.id, i, { storageEnviado: v })} />
-                            <span>TB</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-right pr-6">
                           {!isGuest && (
-                            <button 
+                            <button
                               onClick={() => removeDiskFromGroup(group.id, i)}
                               className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/row:opacity-100"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-          
-          {!isGuest && (
-            <button 
-              onClick={addGroup}
-              className="w-full py-8 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
-            >
-              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-all">
-                <Plus className="w-6 h-6" />
-              </div>
-              <span className="text-xs font-black uppercase tracking-widest">Adicionar Nova Unidade / Grupo de Discos</span>
-            </button>
-          )}
-        </div>
+          </div>
+        ))}
+
+        {!isGuest && (
+          <button
+            onClick={addGroup}
+            className="w-full py-8 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
+          >
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-all">
+              <Plus className="w-6 h-6" />
+            </div>
+            <span className="text-xs font-black uppercase tracking-widest">Adicionar Nova Unidade / Grupo de Discos</span>
+          </button>
+        )}
+      </div>
 
       {/* Detail Chart */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-[450px] flex flex-col">
         <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight mb-6">Curva de Transferência (Storage)</h3>
         <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={allDisks}>
-            <defs>
-              <linearGradient id="colorMapeado" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
-                <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
-              </linearGradient>
-              <linearGradient id="colorEnviado" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis dataKey="path" hide />
-            <YAxis fontSize={10} fontWeight="bold" stroke="#94a3b8" />
-            <Tooltip />
-            <Area type="monotone" dataKey="storageMapeado" stroke="#2563eb" fillOpacity={1} fill="url(#colorMapeado)" name="Mapeado (TB)" />
-            <Area type="monotone" dataKey="storageEnviado" stroke="#10b981" fillOpacity={1} fill="url(#colorEnviado)" name="Enviado (TB)" />
-          </AreaChart>
-        </ResponsiveContainer>
+            <AreaChart data={allDisks}>
+              <defs>
+                <linearGradient id="colorMapeado" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorEnviado" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="path" hide />
+              <YAxis fontSize={10} fontWeight="bold" stroke="#94a3b8" />
+              <Tooltip />
+              <Area type="monotone" dataKey="storageMapeado" stroke="#2563eb" fillOpacity={1} fill="url(#colorMapeado)" name="Mapeado (TB)" />
+              <Area type="monotone" dataKey="storageEnviado" stroke="#10b981" fillOpacity={1} fill="url(#colorEnviado)" name="Enviado (TB)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
+      
+      {/* AI Insight Modal */}
+      <AnimatePresence>
+        {isInsightModalOpen && aiInsight && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsInsightModalOpen(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200"
+            >
+              <div className="bg-slate-900 p-6 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-white uppercase tracking-widest">Insight Executivo IA</h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Relatório Estratégico</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsInsightModalOpen(false)}
+                  className="p-2 hover:bg-slate-800 rounded-xl transition-all text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-8 max-h-[70vh] overflow-y-auto">
+                <div className="prose prose-slate max-w-none">
+                  <div className="space-y-4">
+                    {aiInsight.split('\n').map((line: string, li: number) => {
+                      let currentLine = line.trim();
+                      if (!currentLine) return <div key={li} className="h-2" />;
+                      
+                      const isBullet = currentLine.startsWith('- ') || currentLine.startsWith('* ');
+                      if (isBullet) currentLine = currentLine.slice(2);
+                      
+                      const isHeader = currentLine.startsWith('#');
+                      if (isHeader) currentLine = currentLine.replace(/^#+\s+/, '');
+
+                      const content = currentLine.split(/(\*\*.*?\*\*|`.*?`)/).map((part: string, pi: number) => {
+                        if (part.startsWith('**') && part.endsWith('**')) {
+                          return <strong key={pi} className="text-slate-900 font-black">{part.slice(2, -2)}</strong>;
+                        }
+                        if (part.startsWith('`') && part.endsWith('`')) {
+                          return <code key={pi} className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">{part.slice(1, -1)}</code>;
+                        }
+                        return part;
+                      });
+
+                      if (isBullet) {
+                        return (
+                          <div key={li} className="flex gap-3 items-start ml-2 mb-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 shrink-0" />
+                            <p className="text-slate-600 text-sm leading-relaxed flex-1">{content}</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <p key={li} className={`text-slate-600 text-sm leading-relaxed ${isHeader ? 'text-slate-900 font-black text-base mt-6 mb-2' : ''}`}>
+                          {content}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button 
+                  onClick={() => setIsInsightModalOpen(false)}
+                  className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                >
+                  Entendido
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Comment Modal */}
+      <AnimatePresence>
+        {isCommentModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsCommentModalOpen(false)}
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]"
+            >
+              <div className="bg-slate-900 p-6 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
+                    <MessageSquare className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-black text-white uppercase tracking-widest">Comentário Técnico</h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Observação de Engenharia</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsCommentModalOpen(false)}
+                  className="p-2 hover:bg-slate-800 rounded-xl transition-all text-slate-500 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Nível de Severidade</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      { id: 'sem_prioridade', label: 'Sem Prioridade', color: 'bg-slate-900' },
+                      { id: 'baixa', label: 'Baixa Prioridade', color: 'bg-blue-600' },
+                      { id: 'media', label: 'Média Prioridade', color: 'bg-amber-500' },
+                      { id: 'alta', label: 'Alta Prioridade', color: 'bg-orange-600' },
+                      { id: 'urgente', label: 'Atenção Necessária / Urgente', color: 'bg-rose-600' }
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setCommentSeverity(opt.id as any)}
+                        className={`flex items-center gap-3 w-full p-3 rounded-2xl border-2 transition-all ${
+                          commentSeverity === opt.id 
+                            ? 'border-blue-600 bg-blue-50/50' 
+                            : 'border-slate-100 hover:border-slate-200 bg-white'
+                        }`}
+                      >
+                        <div className={`w-3 h-3 rounded-full ${opt.color}`} />
+                        <span className={`text-xs font-bold ${commentSeverity === opt.id ? 'text-blue-700' : 'text-slate-600'}`}>{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Descrição da Observação</label>
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Descreva detalhes técnicos, impedimentos ou observações relevantes..."
+                    className="w-full h-32 bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all resize-none font-medium text-slate-700"
+                  />
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+                <button 
+                  onClick={() => setIsCommentModalOpen(false)}
+                  className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-100 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={saveComment}
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-all shadow-lg active:scale-95"
+                >
+                  Salvar Comentário
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
-  </div>
   );
 }

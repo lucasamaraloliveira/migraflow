@@ -3,14 +3,14 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { prompt, model = "gemini-1.5-flash" } = await req.json();
+    const { prompt, model = "gemini-3.1-flash-lite-preview" } = await req.json();
 
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json({ error: 'GEMINI_API_KEY is not set on the server' }, { status: 500 });
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
+
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,

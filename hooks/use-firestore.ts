@@ -63,6 +63,10 @@ export interface Disk {
   storageMapeado: number;
   storageEnviado: number;
   destination?: string;
+  comment?: {
+    text: string;
+    severity: 'sem_prioridade' | 'baixa' | 'media' | 'alta' | 'urgente';
+  };
 }
 
 export interface DiskGroup {
