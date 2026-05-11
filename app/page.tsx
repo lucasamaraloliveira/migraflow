@@ -131,10 +131,69 @@ function DashboardContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
+  
+  // Safety Delete States
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    type: 'client' | 'migration' | 'disk';
+    id: string;
+    label: string;
+    item?: any;
+  }>({ isOpen: false, type: 'client', id: '', label: '' });
+
+  const [undoToast, setUndoToast] = useState<{
+    show: boolean;
+    type: 'client' | 'migration' | 'disk';
+    item: any;
+    label: string;
+  }>({ show: false, type: 'client', item: null, label: '' });
 
   const getClientName = (m: any) => {
     const client = clients.find(c => c.id === m.clientId);
     return client?.name || m.clientName || "Cliente Indefinido";
+  };
+
+  // Safe Delete Handlers
+  const triggerDelete = (type: 'client' | 'migration', id: string, label: string) => {
+    const item = type === 'client' ? clients.find(c => c.id === id) : migrations.find(m => m.id === id);
+    setDeleteConfirm({ isOpen: true, type, id, label, item });
+  };
+
+  const executeConfirmDelete = async () => {
+    if (!deleteConfirm.item) return;
+    
+    const { type, id, label, item } = deleteConfirm;
+    
+    try {
+      if (type === 'client') {
+        await deleteClient(id);
+      } else {
+        await deleteMigration(id);
+      }
+      
+      setDeleteConfirm({ ...deleteConfirm, isOpen: false });
+      setUndoToast({ show: true, type, item, label });
+      
+      // Auto-hide toast
+      setTimeout(() => setUndoToast(prev => ({ ...prev, show: false })), 8000);
+    } catch (error) {
+      alert("Erro ao excluir item.");
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!undoToast.item) return;
+    
+    try {
+      if (undoToast.type === 'client') {
+        await addClient(undoToast.item);
+      } else {
+        await addMigration(undoToast.item);
+      }
+      setUndoToast({ ...undoToast, show: false });
+    } catch (error) {
+      alert("Erro ao restaurar item.");
+    }
   };
 
   // Stats
@@ -295,7 +354,7 @@ function DashboardContent() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0">
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 min-w-0 bg-slate-50">
         {/* Mobile User Bar */}
         <div className="md:hidden bg-slate-900 px-4 py-2 flex items-center justify-between border-b border-slate-800 sticky top-0 z-20">
           <div className="flex items-center gap-2">
@@ -619,7 +678,7 @@ function DashboardContent() {
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => deleteClient(client.id!)}
+                              onClick={() => triggerDelete('client', client.id!, client.name)}
                               className="p-2 text-slate-400 hover:text-rose-600 rounded-lg"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -718,7 +777,7 @@ function DashboardContent() {
                                   <Edit2 className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={() => deleteClient(client.id!)}
+                                  onClick={() => triggerDelete('client', client.id!, client.name)}
                                   className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
                                   title="Remover Cliente"
                                 >
@@ -761,7 +820,11 @@ function DashboardContent() {
 
                     const allDisks = [...(m.disks || []), ...(m.groups?.flatMap(g => g.disks || []) || [])];
                     const total = allDisks.reduce((sum, d) => sum + (Number(d.totalPastas) || 0), 0);
-                    const realized = allDisks.reduce((sum, d) => sum + (Number(d.pastasRealizadas) || 0), 0);
+                    const realized = allDisks.reduce((sum, d) => {
+                      const t = Number(d.totalPastas) || 0;
+                      const r = Number(d.pastasRealizadas) || 0;
+                      return sum + Math.min(r, t);
+                    }, 0);
                     const progress = total > 0 ? Math.round((realized / total) * 100) : 0;
 
                     return (
@@ -798,7 +861,7 @@ function DashboardContent() {
                               </button>
                               {!isGuest && (
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); deleteMigration(m.id!); }}
+                                  onClick={(e) => { e.stopPropagation(); triggerDelete('migration', m.id!, getClientName(m)); }}
                                   className="p-2 text-slate-300 hover:text-rose-600 transition-colors"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -813,23 +876,24 @@ function DashboardContent() {
                 </div>
 
                 {/* Desktop Table View for Migrations */}
-                <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left min-w-[800px] md:min-w-full">
+                <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <table className="w-full text-left table-fixed">
                     <thead>
                       <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">
-                        <th className="px-6 py-4">
+                        <th className="px-6 py-4 w-[25%]">
                           <button 
                             onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                            className="flex items-center gap-2 hover:text-white transition-colors"
+                            className="flex items-center gap-2 hover:text-white transition-colors w-full"
                           >
-                            Identificação
-                            {sortOrder === 'asc' ? <ArrowUpAZ className="w-4 h-4 text-blue-500" /> : <ArrowDownAZ className="w-4 h-4" />}
+                            <span className="truncate">Identificação</span>
+                            {sortOrder === 'asc' ? <ArrowUpAZ className="w-4 h-4 text-blue-500 shrink-0" /> : <ArrowDownAZ className="w-4 h-4 shrink-0" />}
                           </button>
                         </th>
-                        <th className="px-6 py-4">Escopo do Projeto</th>
-                        <th className="px-6 py-4 text-center">Status</th>
-                        <th className="px-6 py-4">Cronograma</th>
-                        <th className="px-6 py-4 text-right pr-6">Opções</th>
+                        <th className="px-6 py-4 w-[20%]">Escopo</th>
+                        <th className="px-6 py-4 text-center w-[20%]">Progresso</th>
+                        <th className="px-6 py-4 text-center w-[15%]">Status</th>
+                        <th className="px-6 py-4 w-[12%] text-center">Data</th>
+                        <th className="px-6 py-4 text-right pr-6 w-[8%]"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -840,17 +904,40 @@ function DashboardContent() {
                         return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
                       }).map((m) => (
                         <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 overflow-hidden">
                             <button
                               onClick={() => setSelectedMigrationId(m.id!)}
-                              className="text-left group/btn"
+                              className="text-left group/btn w-full overflow-hidden"
                             >
-                              <p className="text-sm font-bold text-slate-900 uppercase tracking-tighter group-hover/btn:text-blue-600 transition-colors">{getClientName(m)}</p>
-                              <span className="text-[10px] font-mono text-slate-400 italic">REFSUB-{m.id?.slice(-6)}</span>
+                              <p className="text-sm font-bold text-slate-900 uppercase tracking-tighter group-hover/btn:text-blue-600 transition-colors truncate">{getClientName(m)}</p>
+                              <span className="text-[10px] font-mono text-slate-400 italic truncate block">REFSUB-{m.id?.slice(-6)}</span>
                             </button>
                           </td>
+                          <td className="px-6 py-4 overflow-hidden">
+                            <p className="text-xs text-slate-600 leading-relaxed italic truncate">{m.description || 'Nenhuma descrição'}</p>
+                          </td>
                           <td className="px-6 py-4">
-                            <p className="text-xs text-slate-600 leading-relaxed italic">{m.description}</p>
+                            {(() => {
+                              const allDisks = [...(m.disks || []), ...(m.groups?.flatMap(g => g.disks || []) || [])];
+                              const total = allDisks.reduce((sum, d) => sum + (Number(d.totalPastas) || 0), 0);
+                              const realized = allDisks.reduce((sum, d) => {
+                                const t = Number(d.totalPastas) || 0;
+                                const r = Number(d.pastasRealizadas) || 0;
+                                return sum + Math.min(r, t);
+                              }, 0);
+                              const progress = total > 0 ? Math.round((realized / total) * 100) : 0;
+                              return (
+                                <div className="flex items-center gap-3 min-w-[120px]">
+                                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-600'}`} 
+                                      style={{ width: `${progress}%` }} 
+                                    />
+                                  </div>
+                                  <span className={`text-[10px] font-black ${progress === 100 ? 'text-emerald-600' : 'text-slate-900'}`}>{progress}%</span>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-col items-center gap-1.5">
@@ -870,10 +957,9 @@ function DashboardContent() {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-center gap-2 text-[10px] font-bold text-slate-500">
-                              <Clock className="w-3 h-3 text-slate-300" />
-                              <span className="uppercase tracking-widest">{m.endDate || '...'}</span>
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-slate-500">
+                              <span className="uppercase tracking-widest">{m.endDate?.split('-').reverse().slice(0, 2).join('/') || '...'}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-right pr-6">
@@ -886,7 +972,7 @@ function DashboardContent() {
                               </button>
                               {!isGuest && (
                                 <button
-                                  onClick={() => deleteMigration(m.id!)}
+                                  onClick={() => triggerDelete('migration', m.id!, getClientName(m))}
                                   className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-lg transition-all border border-transparent hover:border-rose-100 opacity-0 group-hover:opacity-100"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -965,6 +1051,83 @@ function DashboardContent() {
           )}
         </nav>
       </main>
+
+      {/* Global Undo Toast */}
+      <AnimatePresence>
+        {undoToast.show && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-slate-800 min-w-[320px] md:min-w-[400px]"
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <div className="p-2 bg-rose-500/20 rounded-lg">
+                <Trash2 className="w-4 h-4 text-rose-400" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-white">
+                  {undoToast.type === 'client' ? 'Cliente Removido' : 'Migração Removida'}
+                </p>
+                <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">{undoToast.label}</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleUndo}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-blue-900/40"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Desfazer
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Global Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirm.isOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteConfirm({ ...deleteConfirm, isOpen: false })}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200"
+            >
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Trash2 className="w-8 h-8 text-rose-600" />
+                </div>
+                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">
+                  Excluir {deleteConfirm.type === 'client' ? 'Cliente' : 'Migração'}?
+                </h2>
+                <p className="text-sm text-slate-500 leading-relaxed font-medium">
+                  Você está prestes a remover <span className="text-slate-900 font-bold">{deleteConfirm.label}</span>. Esta ação pode ser desfeita nos próximos segundos.
+                </p>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => setDeleteConfirm({ ...deleteConfirm, isOpen: false })}
+                  className="bg-white text-slate-600 px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs border border-slate-200 hover:bg-slate-100 transition-all active:scale-95"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={executeConfirmDelete}
+                  className="bg-rose-600 text-white px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-all shadow-lg shadow-rose-900/20 active:scale-95"
+                >
+                  Sim, Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1976,7 +2139,27 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   };
 
   const generateAISummary = async () => {
-    if (isGuest) return;
+    // Guest Quota Logic
+    if (isGuest) {
+      const today = new Date().toLocaleDateString();
+      const quotaData = JSON.parse(localStorage.getItem('migraflow_ai_quota') || '{}');
+      
+      if (quotaData.date !== today) {
+        // New day, reset quota
+        quotaData.date = today;
+        quotaData.count = 0;
+      }
+      
+      if (quotaData.count >= 2) {
+        alert("📊 Cota Diária Atingida: Visitantes podem gerar até 2 insights por dia. Entre em contato com o administrador para acesso completo.");
+        return;
+      }
+      
+      // Increment and save
+      quotaData.count += 1;
+      localStorage.setItem('migraflow_ai_quota', JSON.stringify(quotaData));
+    }
+
     setIsGeneratingInsight(true);
     try {
       const diskContext = allDisks.map(d => {
@@ -2034,8 +2217,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                 <CheckCircle2 className="w-3.5 h-3.5 md:w-4 md:h-4" /> <span className="hidden sm:inline">Salvar</span>
               </button>
             )}
-            {!isGuest && (
-              <button
+            <button
                 onClick={generateAISummary}
                 disabled={isGeneratingInsight}
                 className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 border border-blue-500/50 disabled:opacity-50"
@@ -2044,7 +2226,6 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                 <span className="hidden sm:inline">{isGeneratingInsight ? 'Gerando...' : 'IA Insight'}</span>
                 {!isGeneratingInsight && <span className="sm:hidden">IA</span>}
               </button>
-            )}
           </div>
         </div>
 
