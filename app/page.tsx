@@ -845,7 +845,7 @@ function DashboardContent() {
         )}
 
         {/* Bottom Navigation for Mobile */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-4 py-2 flex items-center justify-around z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-4 py-4 flex items-center justify-around z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
           <BottomNavLink
             icon={BarChart3}
             label="Painel"
@@ -888,10 +888,10 @@ function BottomNavLink({ icon: Icon, label, active, onClick }: { icon: any, labe
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center gap-1 transition-all duration-300 ${active ? 'text-blue-500 scale-110' : 'text-slate-500'}`}
+      className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${active ? 'text-blue-500 scale-110' : 'text-slate-500'}`}
     >
-      <Icon className="w-5 h-5" />
-      <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
+      <Icon className="w-6 h-6" />
+      <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
       {active && (
         <motion.div
           layoutId="activeTabMobile"
