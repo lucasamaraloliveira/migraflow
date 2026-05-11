@@ -30,6 +30,25 @@ interface FirestoreErrorInfo {
   authInfo: any;
 }
 
+const sanitizeForFirestore = (data: any): any => {
+  if (data === undefined) return null;
+  if (data === null || typeof data !== 'object' || 
+      (data.constructor && (data.constructor.name === 'Timestamp' || data.constructor.name === 'FieldValue'))) return data;
+  
+  if (Array.isArray(data)) {
+    return data.map(sanitizeForFirestore);
+  }
+  
+  const sanitized: any = {};
+  for (const key in data) {
+    const value = data[key];
+    if (value !== undefined) {
+      sanitized[key] = sanitizeForFirestore(value);
+    }
+  }
+  return sanitized;
+};
+
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -108,10 +127,10 @@ export function useClients() {
 
   const addClient = async (client: Omit<Client, 'id' | 'createdAt'>) => {
     try {
-      await addDoc(collection(db, 'clients'), {
+      await addDoc(collection(db, 'clients'), sanitizeForFirestore({
         ...client,
         createdAt: serverTimestamp()
-      });
+      }));
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'clients');
     }
@@ -127,7 +146,7 @@ export function useClients() {
 
   const updateClient = async (id: string, data: Partial<Client>) => {
     try {
-      await updateDoc(doc(db, 'clients', id), data);
+      await updateDoc(doc(db, 'clients', id), sanitizeForFirestore(data));
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `clients/${id}`);
     }
@@ -152,12 +171,28 @@ export function useMigrations() {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    const q = query(collection(db, 'migrations'), orderBy('updatedAt', 'desc'));
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const migrationsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Migration[];
+        setMigrations(migrationsData);
+        setLoading(false);
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, 'migrations')
+    );
+    return unsubscribe;
+  }, []);
+
   const addMigration = async (migration: Omit<Migration, 'id' | 'updatedAt'>) => {
     try {
-      await addDoc(collection(db, 'migrations'), {
+      await addDoc(collection(db, 'migrations'), sanitizeForFirestore({
         ...migration,
         updatedAt: serverTimestamp()
-      });
+      }));
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'migrations');
     }
@@ -165,10 +200,10 @@ export function useMigrations() {
 
   const updateMigration = async (id: string, data: Partial<Migration>) => {
     try {
-      await updateDoc(doc(db, 'migrations', id), {
+      await updateDoc(doc(db, 'migrations', id), sanitizeForFirestore({
         ...data,
         updatedAt: serverTimestamp()
-      });
+      }));
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `migrations/${id}`);
     }

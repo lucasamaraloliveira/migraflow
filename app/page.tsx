@@ -1590,8 +1590,14 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const parseNum = (val: any) => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
-    const cleanVal = String(val).replace(/\./g, '').replace(',', '.');
-    return parseFloat(cleanVal) || 0;
+    const s = String(val);
+    // Se contém vírgula, tratamos como formato brasileiro (ex: 1.234,56 ou 5,81)
+    if (s.includes(',')) {
+      const cleanVal = s.replace(/\./g, '').replace(',', '.');
+      return parseFloat(cleanVal) || 0;
+    }
+    // Se não contém vírgula, tratamos como formato padrão JS/US (ex: 1234.56 ou 5.81)
+    return parseFloat(s) || 0;
   };
 
   const allDisks = editedGroups.flatMap(g => g.disks);
@@ -1612,6 +1618,21 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const total = summary.totalPastas;
   const realized = summary.pastasRealizadas;
   summary.progresso = total > 0 ? Number(((realized / total) * 100).toFixed(2)) : 0;
+
+  const getGroupSummary = (groupDisks: Disk[]) => {
+    const totalPastas = groupDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0);
+    const pastasRealizadas = groupDisks.reduce((acc, d) => {
+      const total = parseNum(d.totalPastas);
+      const realized = parseNum(d.pastasRealizadas);
+      return acc + Math.min(realized, total);
+    }, 0);
+    const estudosEnviados = groupDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0);
+    const storageMapeado = groupDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0);
+    const storageEnviado = groupDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0);
+    const progresso = totalPastas > 0 ? Number(((pastasRealizadas / totalPastas) * 100).toFixed(2)) : 0;
+    
+    return { totalPastas, pastasRealizadas, estudosEnviados, storageMapeado, storageEnviado, progresso };
+  };
 
   const addGroup = () => {
     if (isGuest) return;
@@ -1731,11 +1752,20 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       const sanitizeNum = (val: any) => {
         if (typeof val === 'number') return val;
         if (!val) return 0;
-        const cleanVal = String(val).replace(/[^\d,.-]/g, '').replace(',', '.');
-        return parseFloat(cleanVal) || 0;
+        const s = String(val).replace(/[^\d,.-]/g, '');
+        // Se contém vírgula, tratamos como formato brasileiro (ex: 1.234,56)
+        if (s.includes(',')) {
+          const cleanVal = s.replace(/\./g, '').replace(',', '.');
+          return parseFloat(cleanVal) || 0;
+        }
+        // Caso contrário, tratamos como formato padrão
+        return parseFloat(s) || 0;
       };
 
       let lastCumulative = 0;
+      let lastMapeado = 0;
+      let lastEnviado = 0;
+
       const importedDisks: Disk[] = dataRows
         .filter(row => row.length > 0 && row[findIdx(['caminho', 'path'])])
         .map(row => {
@@ -1752,16 +1782,28 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
           const currentPath = String(pathIdx !== -1 ? row[pathIdx] : '');
           const currentCumulative = sanitizeNum(realIdx !== -1 ? row[realIdx] : 0);
           const total = sanitizeNum(totIdx !== -1 ? row[totIdx] : 0);
+          const currentMapeado = sanitizeNum(mapIdx !== -1 ? row[mapIdx] : 0);
+          const currentEnviado = sanitizeNum(envIdx !== -1 ? row[envIdx] : 0);
 
-          if (currentCumulative < lastCumulative) {
-            lastCumulative = 0;
-          }
+          // Lógica de incremento (Choice 1 corrigida: extraímos o incremento da planilha cumulativa)
+          if (currentMapeado < lastMapeado) lastMapeado = 0;
+          if (currentEnviado < lastEnviado) lastEnviado = 0;
+          
+          const individualMapeado = Math.max(0, currentMapeado - lastMapeado);
+          const individualEnviado = Math.max(0, currentEnviado - lastEnviado);
+          
+          lastMapeado = currentMapeado;
+          lastEnviado = currentEnviado;
 
+          if (currentCumulative < lastCumulative) lastCumulative = 0;
           const individualRealized = Math.max(0, currentCumulative - lastCumulative);
           lastCumulative = currentCumulative;
 
           const statusVal = String(statusIdx !== -1 ? row[statusIdx] : '').toLowerCase();
           const isFinished = statusVal.includes('realizado') || statusVal.includes('concluido') || statusVal.includes('finalizado') || (individualRealized >= total && total > 0);
+
+          // Se o enviado vier zerado da planilha, assumimos que ele segue o mapeado (para não quebrar a soma)
+          const finalIndividualEnviado = individualEnviado > 0 ? individualEnviado : individualMapeado;
 
           return {
             path: currentPath,
@@ -1770,8 +1812,8 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
             estudos: sanitizeNum(estIdx !== -1 ? row[estIdx] : 0),
             send: sanitizeNum(sendIdx !== -1 ? row[sendIdx] : 0),
             totalPastas: total,
-            storageMapeado: sanitizeNum(mapIdx !== -1 ? row[mapIdx] : 0),
-            storageEnviado: sanitizeNum(envIdx !== -1 ? row[envIdx] : 0),
+            storageMapeado: individualMapeado,
+            storageEnviado: finalIndividualEnviado,
             destination: destIdx !== -1 ? String(row[destIdx]) : undefined
           };
         });
@@ -1834,8 +1876,8 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
               <BarChart3 className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Resumo Executivo do Projeto</h3>
-              <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-0.5">Indicadores de Performance e Volumetria</p>
+              <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Resumo Geral da Migração</h3>
+              <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-0.5">Indicadores Globais de Performance</p>
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
@@ -1907,9 +1949,48 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
       {/* Groups and Tables Section */}
       <div className="space-y-12">
-        {editedGroups.map((group) => (
-          <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {editedGroups.map((group) => {
+          const groupSummary = getGroupSummary(group.disks);
+          return (
+            <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              {/* Group Executive Summary */}
+              <div className="grid grid-cols-2 md:grid-cols-6 divide-x divide-slate-50 bg-slate-50/50 border-b border-slate-100">
+                <div className="p-3 flex flex-col items-center justify-center text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Pastas</span>
+                  <span className="text-xs font-black text-slate-700 tracking-tighter">
+                    {groupSummary.pastasRealizadas.toLocaleString()} / {groupSummary.totalPastas.toLocaleString()}
+                  </span>
+                </div>
+                <div className="p-3 flex flex-col items-center justify-center text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso</span>
+                  <span className={`text-xs font-black tracking-tighter ${groupSummary.progresso === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>
+                    {groupSummary.progresso}%
+                  </span>
+                </div>
+                <div className="p-3 flex flex-col items-center justify-center text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudos</span>
+                  <span className="text-xs font-black text-slate-700 tracking-tighter">{groupSummary.estudosEnviados.toLocaleString()}</span>
+                </div>
+                <div className="p-3 flex flex-col items-center justify-center text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mapeado</span>
+                  <span className="text-xs font-black text-slate-700 tracking-tighter">{groupSummary.storageMapeado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} TB</span>
+                </div>
+                <div className="p-3 flex flex-col items-center justify-center text-center">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Enviado</span>
+                  <span className="text-xs font-black text-blue-600 tracking-tighter">{groupSummary.storageEnviado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} TB</span>
+                </div>
+                <div className="p-3 flex flex-col items-center justify-center bg-slate-100/30">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Resumo Unidade</span>
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 ${groupSummary.progresso === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                      style={{ width: `${groupSummary.progresso}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-3 flex-1 w-full">
                 {isEditing ? (
                   <input
@@ -1955,137 +2036,160 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
             {/* Mobile Card Layout for Disks */}
             <div className="grid grid-cols-1 gap-3 p-4 md:hidden bg-slate-50/30">
-              {group.disks.map((d: Disk, i: number) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
-                  <div className="flex justify-between items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <input
-                        type="text"
-                        className="w-full bg-transparent text-xs font-mono font-bold text-slate-800 outline-none focus:text-blue-600 border-b border-transparent focus:border-blue-200 pb-1"
-                        value={d.path}
-                        onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
-                      />
-                      {d.destination && (
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded uppercase tracking-widest">Destino</span>
-                          <input
-                            type="text"
-                            className="flex-1 bg-transparent text-[10px] font-mono text-slate-500 outline-none truncate"
-                            value={d.destination}
-                            onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <select
-                      value={d.status}
-                      onChange={(e) => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
-                      className={`text-[9px] font-black uppercase tracking-widest rounded-lg px-2 py-1 outline-none border transition-all ${
-                        d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                        d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
-                        d.status === 'Pausado' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                        'bg-slate-50 text-slate-400 border-slate-200'
-                      }`}
-                    >
-                      <option value="Pendente">Pendente</option>
-                      <option value="Realizando">Realizando</option>
-                      <option value="Pausado">Pausado</option>
-                      <option value="Realizado">Realizado</option>
-                    </select>
-                  </div>
+              {group.disks.map((d: Disk, i: number) => {
+                const previousDisks = group.disks.slice(0, i);
+                const sumPrevMapeado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageMapeado), 0);
+                const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
+                const currentRunningMapeado = sumPrevMapeado + parseNum(d.storageMapeado);
+                const currentRunningEnviado = sumPrevEnviado + parseNum(d.storageEnviado);
 
-                  <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-50">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Realizadas</span>
-                      <NumericInput 
-                        readOnly={isGuest}
-                        value={d.pastasRealizadas}
-                        onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })}
-                        className="w-full text-center text-xs font-black text-emerald-600 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-emerald-200"
-                      />
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Estudos</span>
-                      <NumericInput 
-                        readOnly={isGuest}
-                        value={d.estudos}
-                        onChange={v => updateDiskInGroup(group.id, i, { estudos: v })}
-                        className="w-full text-center text-xs font-black text-slate-900 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
-                      />
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total</span>
-                      <NumericInput 
-                        readOnly={isGuest}
-                        value={d.totalPastas}
-                        onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })}
-                        className="w-full text-center text-xs font-black text-slate-400 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onMouseEnter={(e) => {
-                          if (d.comment) {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setHoveredComment({
-                              text: d.comment.text,
-                              severity: d.comment.severity,
-                              x: rect.left,
-                              y: rect.top
-                            });
-                          }
-                        }}
-                        onMouseLeave={() => setHoveredComment(null)}
-                        onClick={() => {
-                          if (isGuest) return;
-                          setCommentModalTarget({ groupId: group.id, diskIdx: i });
-                          setCommentText(d.comment?.text || '');
-                          setCommentSeverity(d.comment?.severity || 'sem_prioridade');
-                          setIsCommentModalOpen(true);
-                        }}
-                        className={`p-2 rounded-xl transition-all ${
-                          d.comment 
-                            ? getSeverityColor(d.comment.severity) 
-                            : 'bg-slate-50 text-slate-300 hover:bg-slate-100'
-                        }`}
+                return (
+                  <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <input
+                          type="text"
+                          className="w-full bg-transparent text-xs font-mono font-bold text-slate-800 outline-none focus:text-blue-600 border-b border-transparent focus:border-blue-200 pb-1"
+                          value={d.path}
+                          onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
+                        />
+                        {d.destination && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded uppercase tracking-widest">Destino</span>
+                            <input
+                              type="text"
+                              className="flex-1 bg-transparent text-[10px] font-mono text-slate-500 outline-none truncate"
+                              value={d.destination}
+                              onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <select
+                        value={d.status}
+                        onChange={(e) => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
+                        className={`text-[9px] font-black uppercase tracking-widest rounded-lg px-2 py-1 outline-none border transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                          d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
+                            d.status === 'Pausado' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                              'bg-slate-50 text-slate-400 border-slate-200'
+                          }`}
                       >
-                        <MessageSquare className="w-4 h-4" />
-                      </button>
-                      {!isGuest && (
-                        <button
-                          onClick={() => removeDiskFromGroup(group.id, i)}
-                          className="p-2 bg-rose-50 text-rose-300 hover:text-rose-600 rounded-xl transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                        <option value="Pendente">Pendente</option>
+                        <option value="Realizando">Realizando</option>
+                        <option value="Pausado">Pausado</option>
+                        <option value="Realizado">Realizado</option>
+                      </select>
                     </div>
-                    <div className="flex flex-col items-end">
+
+                    <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-50">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Realizadas</span>
+                        <NumericInput
+                          readOnly={isGuest}
+                          value={d.pastasRealizadas}
+                          onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })}
+                          className="w-full text-center text-xs font-black text-emerald-600 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-emerald-200"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Estudos</span>
+                        <NumericInput
+                          readOnly={isGuest}
+                          value={d.estudos}
+                          onChange={v => updateDiskInGroup(group.id, i, { estudos: v })}
+                          className="w-full text-center text-xs font-black text-slate-900 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total</span>
+                        <NumericInput
+                          readOnly={isGuest}
+                          value={d.totalPastas}
+                          onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })}
+                          className="w-full text-center text-xs font-black text-slate-400 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <NumericInput 
-                          isFloat
-                          readOnly={isGuest}
-                          value={d.storageEnviado}
-                          onChange={v => updateDiskInGroup(group.id, i, { storageEnviado: v })}
-                          className="w-12 text-right text-[10px] font-black text-blue-600 bg-transparent outline-none focus:ring-1 focus:ring-blue-100 rounded"
-                        />
-                        <span className="text-[9px] font-bold text-slate-300">/</span>
-                        <NumericInput 
-                          isFloat
-                          readOnly={isGuest}
-                          value={d.storageMapeado}
-                          onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v })}
-                          className="w-12 text-left text-[10px] font-black text-slate-400 bg-transparent outline-none focus:ring-1 focus:ring-slate-100 rounded"
-                        />
-                        <span className="text-[9px] font-black text-slate-400 uppercase">TB</span>
+                        <div className="relative group/tooltip">
+                          {(!isGuest || d.comment) && (
+                            <button
+                              onMouseEnter={(e) => {
+                                if (d.comment) {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setHoveredComment({
+                                    text: d.comment.text,
+                                    severity: d.comment.severity,
+                                    x: rect.left,
+                                    y: rect.top
+                                  });
+                                }
+                              }}
+                              onMouseLeave={() => setHoveredComment(null)}
+                              onClick={() => {
+                                if (isGuest) return;
+                                setCommentModalTarget({ groupId: group.id, diskIdx: i });
+                                setCommentText(d.comment?.text || '');
+                                setCommentSeverity(d.comment?.severity || 'sem_prioridade');
+                                setIsCommentModalOpen(true);
+                              }}
+                              className={`p-2 rounded-xl transition-all ${d.comment
+                                ? getSeverityColor(d.comment.severity)
+                                : 'bg-slate-50 text-slate-300 hover:bg-slate-100'
+                                }`}
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        {!isGuest && (
+                          <button
+                            onClick={() => removeDiskFromGroup(group.id, i)}
+                            className="p-2 bg-rose-50 text-rose-300 hover:text-rose-600 rounded-xl transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-2">
+                          <div className="flex flex-col items-end">
+                            <div className="flex items-center gap-1">
+                              <NumericInput
+                                isFloat
+                                readOnly={isGuest}
+                                value={currentRunningEnviado}
+                                onChange={v => {
+                                  const delta = Math.max(0, v - sumPrevEnviado);
+                                  updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
+                                }}
+                                className="w-10 text-right text-[10px] font-black text-emerald-600 bg-slate-50 outline-none focus:ring-1 focus:ring-emerald-100 rounded"
+                              />
+                              <span className="text-[8px] font-black text-emerald-500">TB</span>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-300">/</span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[7px] font-black text-blue-500 uppercase mb-0.5">Incremento</span>
+                            <div className="flex items-center gap-1">
+                              <NumericInput
+                                isFloat
+                                readOnly={isGuest}
+                                value={d.storageMapeado}
+                                onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
+                                className="w-10 text-left text-[10px] font-black text-slate-400 bg-slate-50 outline-none focus:ring-1 focus:ring-slate-100 rounded"
+                              />
+                              <span className="text-[8px] font-black text-slate-400">TB</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="hidden md:block overflow-x-auto custom-scrollbar">
@@ -2104,86 +2208,114 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {group.disks.map((d: Disk, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors group/row">
-                      <td className="p-4 pl-6">
-                        <input
-                          type="text"
-                          className="w-full bg-transparent text-[11px] font-mono font-bold text-slate-700 outline-none focus:text-blue-600"
-                          value={d.path}
-                          onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
-                        />
-                        {d.destination && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1 rounded uppercase">Destino</span>
-                            <input
-                              type="text"
-                              className="flex-1 bg-transparent text-[10px] font-mono text-slate-400 outline-none"
-                              value={d.destination}
-                              onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
-                            />
+                  {group.disks.map((d: Disk, i: number) => {
+                    const previousDisks = group.disks.slice(0, i);
+                    const sumPrevMapeado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageMapeado), 0);
+                    const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
+                    const currentRunningMapeado = sumPrevMapeado + parseNum(d.storageMapeado);
+                    const currentRunningEnviado = sumPrevEnviado + parseNum(d.storageEnviado);
+
+                    return (
+                      <tr key={i} className="hover:bg-slate-50/50 transition-colors group/row">
+                        <td className="p-4 pl-6">
+                          <input
+                            type="text"
+                            className="w-full bg-transparent text-[11px] font-mono font-bold text-slate-700 outline-none focus:text-blue-600"
+                            value={d.path}
+                            onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
+                          />
+                          {d.destination && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1 rounded uppercase">Destino</span>
+                              <input
+                                type="text"
+                                className="flex-1 bg-transparent text-[10px] font-mono text-slate-400 outline-none"
+                                value={d.destination}
+                                onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
+                              />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4 text-center">
+                          <select
+                            disabled={isGuest}
+                            className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                              d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                d.status === 'Pausado' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                  'bg-slate-50 text-slate-400 border-slate-100'
+                              }`}
+                            value={d.status}
+                            onChange={e => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
+                          >
+                            <option value="Pendente">Pendente</option>
+                            <option value="Realizando">Execução</option>
+                            <option value="Pausado">Pausado</option>
+                            <option value="Realizado">Finalizado</option>
+                          </select>
+                        </td>
+                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.pastasRealizadas} onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })} />
+                        </td>
+                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.estudos} onChange={v => updateDiskInGroup(group.id, i, { estudos: v })} />
+                        </td>
+                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.send} onChange={v => updateDiskInGroup(group.id, i, { send: v })} />
+                        </td>
+                        <td className="p-4 text-center text-xs font-mono font-black text-slate-400">
+                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.totalPastas} onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })} />
+                        </td>
+                        <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-400">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex items-center gap-1">
+                              <NumericInput
+                                isFloat
+                                readOnly={isGuest}
+                                className="w-12 bg-slate-50 text-center outline-none rounded"
+                                value={d.storageMapeado}
+                                onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
+                              />
+                              <span className="text-[8px] font-black text-slate-400">TB</span>
+                            </div>
+                            <span className="text-[7px] font-black text-slate-400 uppercase leading-none">Incremento</span>
                           </div>
-                        )}
-                      </td>
-                      <td className="p-4 text-center">
-                        <select
-                          disabled={isGuest}
-                          className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                            d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                              d.status === 'Pausado' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                'bg-slate-50 text-slate-400 border-slate-100'
-                            }`}
-                          value={d.status}
-                          onChange={e => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
-                        >
-                          <option value="Pendente">Pendente</option>
-                          <option value="Realizando">Execução</option>
-                          <option value="Pausado">Pausado</option>
-                          <option value="Realizado">Finalizado</option>
-                        </select>
-                      </td>
-                      <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                        <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.pastasRealizadas} onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })} />
-                      </td>
-                      <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                        <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.estudos} onChange={v => updateDiskInGroup(group.id, i, { estudos: v })} />
-                      </td>
-                      <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                        <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.send} onChange={v => updateDiskInGroup(group.id, i, { send: v })} />
-                      </td>
-                      <td className="p-4 text-center text-xs font-mono font-black text-slate-400">
-                        <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.totalPastas} onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })} />
-                      </td>
-                      <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-400">
-                        <div className="flex items-center justify-end gap-1">
-                          <NumericInput isFloat readOnly={isGuest} className="w-12 bg-transparent text-right outline-none" value={d.storageMapeado} onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v })} />
-                          <span>TB</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
-                        <div className="flex items-center justify-end gap-1">
-                          <NumericInput isFloat readOnly={isGuest} className="w-12 bg-transparent text-right outline-none" value={d.storageEnviado} onChange={v => updateDiskInGroup(group.id, i, { storageEnviado: v })} />
-                          <span>TB</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right pr-6">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="relative group/tooltip">
-                            {(!isGuest || d.comment) && (
-                              <button
-                                onClick={() => {
-                                  if (isGuest) return;
-                                  setCommentModalTarget({ groupId: group.id, diskIdx: i });
-                                  setCommentText(d.comment?.text || '');
-                                  setCommentSeverity(d.comment?.severity || 'sem_prioridade');
-                                  setIsCommentModalOpen(true);
+                        </td>
+                        <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex items-center gap-1">
+                              <NumericInput
+                                isFloat
+                                readOnly={isGuest}
+                                className="w-12 bg-emerald-50 text-center outline-none rounded border border-emerald-100"
+                                value={currentRunningEnviado}
+                                onChange={v => {
+                                  const delta = Math.max(0, v - sumPrevEnviado);
+                                  updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
                                 }}
-                                className={`p-1.5 rounded-lg transition-all ${isGuest ? 'cursor-default' : 'cursor-pointer'} ${d.comment ? getSeverityColor(d.comment.severity) : 'text-slate-300 hover:text-blue-600 hover:bg-blue-50'}`}
-                                title={isGuest ? "Observação Técnica" : "Comentário Técnico"}
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                              />
+                              <span className="text-[8px] font-black text-emerald-600">TB</span>
+                            </div>
+                            <span className="text-[7px] font-black text-emerald-600 uppercase leading-none text-center">Total Unidade</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-right pr-6">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="relative group/tooltip">
+                              {(!isGuest || d.comment) && (
+                                <button
+                                  onClick={() => {
+                                    if (isGuest) return;
+                                    setCommentModalTarget({ groupId: group.id, diskIdx: i });
+                                    setCommentText(d.comment?.text || '');
+                                    setCommentSeverity(d.comment?.severity || 'sem_prioridade');
+                                    setIsCommentModalOpen(true);
+                                  }}
+                                  className={`p-1.5 rounded-lg transition-all ${isGuest ? 'cursor-default' : 'cursor-pointer'} ${d.comment ? getSeverityColor(d.comment.severity) : 'text-slate-300 hover:text-blue-600 hover:bg-blue-50'}`}
+                                  title={isGuest ? "Observação Técnica" : "Comentário Técnico"}
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             {d.comment?.text && (
                               <div className="absolute bottom-full right-0 mb-3 w-72 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none translate-y-2 group-hover/tooltip:translate-y-0">
                                 <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
@@ -2212,13 +2344,15 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                           )}
                         </div>
                       </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ))}
+                      </tr>
+                    );
+                  })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
 
         {!isGuest && (
           <button
