@@ -695,16 +695,18 @@ function DashboardContent() {
         </div>
 
         {/* AI Floating Trigger */}
-        <button
-          onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white w-16 h-16 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-110 active:scale-95 group flex flex-col items-center justify-center z-30"
-        >
-          <div className="relative mb-1">
-            <MessageSquare className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-          </div>
-          <span className="font-black text-[10px] uppercase tracking-[0.15em] opacity-80">IA</span>
-        </button>
+        {!isGuest && (
+          <button
+            onClick={() => setIsChatOpen(true)}
+            className="fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white w-16 h-16 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-110 active:scale-95 group flex flex-col items-center justify-center z-30"
+          >
+            <div className="relative mb-1">
+              <MessageSquare className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
+              <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+            </div>
+            <span className="font-black text-[10px] uppercase tracking-[0.15em] opacity-80">IA</span>
+          </button>
+        )}
 
         {/* Modals & AI Panel (Drawer Side) */}
         <MigrationModal isOpen={isMigrationModalOpen} onClose={() => setIsMigrationModalOpen(false)} clients={clients} onAdd={addMigration} isGuest={isGuest} />
@@ -719,7 +721,9 @@ function DashboardContent() {
           clientToEdit={clientToEdit}
           isGuest={isGuest}
         />
-        <AIChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} migrations={migrations} isGuest={isGuest} />
+        {!isGuest && (
+          <AIChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} migrations={migrations} isGuest={isGuest} />
+        )}
       </main>
     </div>
   );
@@ -1608,22 +1612,24 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                 <CheckCircle2 className="w-4 h-4" /> Salvar Alterações
               </button>
             )}
-            <button
-              onClick={generateAISummary}
-              disabled={isGeneratingInsight}
-              className={`flex items-center gap-2 bg-slate-800 text-blue-400 px-4 py-2 rounded-lg hover:bg-slate-700 transition-all text-[10px] font-black uppercase tracking-widest border border-slate-700 shadow-sm ${isGeneratingInsight ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {isGeneratingInsight ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" /> Gerar Insight IA
-                </>
-              )}
-            </button>
+            {!isGuest && (
+              <button
+                onClick={generateAISummary}
+                disabled={isGeneratingInsight}
+                className={`flex items-center gap-2 bg-slate-800 text-blue-400 px-4 py-2 rounded-lg hover:bg-slate-700 transition-all text-[10px] font-black uppercase tracking-widest border border-slate-700 shadow-sm ${isGeneratingInsight ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {isGeneratingInsight ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" /> Gerar Insight IA
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1651,11 +1657,19 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
           <div className="p-6 flex flex-col items-center justify-center bg-slate-50/50">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Progresso Total</span>
             <div className="flex items-center gap-3">
-              <span className="text-3xl font-black text-blue-600 tracking-tighter">{summary.progresso}%</span>
+              <span className={`text-3xl font-black tracking-tighter transition-colors ${summary.progresso === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>
+                {summary.progresso}%
+              </span>
               <div className="w-12 h-12 relative">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-200" strokeWidth="4" />
-                  <circle cx="18" cy="18" r="16" fill="none" className="stroke-blue-600 transition-all duration-1000" strokeWidth="4" strokeDasharray={`${summary.progresso}, 100`} strokeLinecap="round" />
+                  <circle 
+                    cx="18" cy="18" r="16" fill="none" 
+                    className={`${summary.progresso === 100 ? 'stroke-emerald-600' : 'stroke-blue-600'} transition-all duration-1000`} 
+                    strokeWidth="4" 
+                    strokeDasharray={`${summary.progresso}, 100`} 
+                    strokeLinecap="round" 
+                  />
                 </svg>
               </div>
             </div>
@@ -1792,18 +1806,21 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                       <td className="p-4 text-right pr-6">
                         <div className="flex items-center justify-end gap-2">
                           <div className="relative group/tooltip">
-                            <button
-                              onClick={() => {
-                                setCommentModalTarget({ groupId: group.id, diskIdx: i });
-                                setCommentText(d.comment?.text || '');
-                                setCommentSeverity(d.comment?.severity || 'sem_prioridade');
-                                setIsCommentModalOpen(true);
-                              }}
-                              className={`p-1.5 rounded-lg transition-all ${d.comment ? getSeverityColor(d.comment.severity) : 'text-slate-300 hover:text-blue-600 hover:bg-blue-50'}`}
-                              title="Comentário Técnico"
-                            >
-                              <MessageSquare className="w-3.5 h-3.5" />
-                            </button>
+                            {(!isGuest || d.comment) && (
+                              <button
+                                onClick={() => {
+                                  if (isGuest) return;
+                                  setCommentModalTarget({ groupId: group.id, diskIdx: i });
+                                  setCommentText(d.comment?.text || '');
+                                  setCommentSeverity(d.comment?.severity || 'sem_prioridade');
+                                  setIsCommentModalOpen(true);
+                                }}
+                                className={`p-1.5 rounded-lg transition-all ${isGuest ? 'cursor-default' : 'cursor-pointer'} ${d.comment ? getSeverityColor(d.comment.severity) : 'text-slate-300 hover:text-blue-600 hover:bg-blue-50'}`}
+                                title={isGuest ? "Observação Técnica" : "Comentário Técnico"}
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             {d.comment?.text && (
                               <div className="absolute bottom-full right-0 mb-3 w-72 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none translate-y-2 group-hover/tooltip:translate-y-0">
                                 <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
