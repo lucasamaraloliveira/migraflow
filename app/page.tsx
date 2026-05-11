@@ -2167,7 +2167,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                                   const delta = Math.max(0, v - sumPrevEnviado);
                                   updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
                                 }}
-                                className="w-10 text-right text-[10px] font-black text-emerald-600 bg-slate-50 outline-none focus:ring-1 focus:ring-emerald-100 rounded"
+                                className="w-16 text-right text-[11px] font-black text-emerald-600 bg-slate-50 outline-none focus:ring-1 focus:ring-emerald-100 rounded px-1.5 py-0.5"
                               />
                               <span className="text-[8px] font-black text-emerald-500">TB</span>
                             </div>
@@ -2181,7 +2181,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                                 readOnly={isGuest}
                                 value={d.storageMapeado}
                                 onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
-                                className="w-10 text-left text-[10px] font-black text-slate-400 bg-slate-50 outline-none focus:ring-1 focus:ring-slate-100 rounded"
+                                className="w-16 text-left text-[11px] font-black text-slate-400 bg-slate-50 outline-none focus:ring-1 focus:ring-slate-100 rounded px-1.5 py-0.5"
                               />
                               <span className="text-[8px] font-black text-slate-400">TB</span>
                             </div>
@@ -2275,7 +2275,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                               <NumericInput
                                 isFloat
                                 readOnly={isGuest}
-                                className="w-12 bg-slate-50 text-center outline-none rounded"
+                                className="w-20 bg-slate-50 text-center text-xs font-black outline-none rounded py-1 px-1.5"
                                 value={d.storageMapeado}
                                 onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
                               />
@@ -2290,7 +2290,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                               <NumericInput
                                 isFloat
                                 readOnly={isGuest}
-                                className="w-12 bg-emerald-50 text-center outline-none rounded border border-emerald-100"
+                                className="w-20 bg-emerald-50 text-center text-xs font-black outline-none rounded border border-emerald-100 py-1 px-1.5"
                                 value={currentRunningEnviado}
                                 onChange={v => {
                                   const delta = Math.max(0, v - sumPrevEnviado);
