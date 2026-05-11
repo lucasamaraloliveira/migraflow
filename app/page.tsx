@@ -403,39 +403,74 @@ function DashboardContent() {
                       <BarChart3 className="w-4 h-4 text-blue-600" />
                       Volumetria por Cliente (Estudos vs Pastas)
                     </h3>
-                    <div className="flex-1">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ bottom: 40 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                          <XAxis
-                            dataKey="name"
-                            fontSize={10}
-                            stroke="#94a3b8"
-                            interval={0}
-                            angle={-15}
-                            textAnchor="end"
-                            height={60}
-                          />
-                          <YAxis fontSize={10} stroke="#94a3b8" />
-                          <Tooltip
-                            formatter={(value: any, name: any) => {
-                              const label = name === 'volume' ? 'Volume' :
-                                name === 'estudos' ? 'Estudos' :
-                                  name === 'pastas' ? 'Pastas' : name;
-                              const unit = name === 'volume' ? ' TB' : '';
-                              return [`${value?.toLocaleString() || '0'}${unit}`, label];
-                            }}
-                            contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff' }}
-                            itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
-                          />
-                          <Bar dataKey="estudos" fill="#2563eb" radius={[4, 4, 0, 0]} name="Estudos">
-                            <LabelList dataKey="estudos" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#1e293b' }} />
-                          </Bar>
-                          <Bar dataKey="pastas" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Pastas">
-                            <LabelList dataKey="pastas" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#64748b' }} />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                    <div className="flex-1 min-h-[300px]">
+                      {/* Desktop Chart: Vertical Bars */}
+                      <div className="hidden md:block h-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ bottom: 40 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <XAxis
+                              dataKey="name"
+                              fontSize={10}
+                              stroke="#94a3b8"
+                              interval={0}
+                              angle={-15}
+                              textAnchor="end"
+                              height={60}
+                            />
+                            <YAxis fontSize={10} stroke="#94a3b8" />
+                            <Tooltip
+                              formatter={(value: any, name: any) => {
+                                const label = name === 'volume' ? 'Volume' :
+                                  name === 'estudos' ? 'Estudos' :
+                                    name === 'pastas' ? 'Pastas' : name;
+                                const unit = name === 'volume' ? ' TB' : '';
+                                return [`${value?.toLocaleString() || '0'}${unit}`, label];
+                              }}
+                              contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff' }}
+                              itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
+                            />
+                            <Bar dataKey="estudos" fill="#2563eb" radius={[4, 4, 0, 0]} name="Estudos">
+                              <LabelList dataKey="estudos" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#1e293b' }} />
+                            </Bar>
+                            <Bar dataKey="pastas" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Pastas">
+                              <LabelList dataKey="pastas" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#64748b' }} />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Mobile Chart: Horizontal Bars for better legibility */}
+                      <div className="md:hidden h-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart 
+                            layout="vertical" 
+                            data={chartData} 
+                            margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                            <XAxis type="number" fontSize={9} stroke="#94a3b8" />
+                            <YAxis 
+                              dataKey="name" 
+                              type="category" 
+                              fontSize={9} 
+                              stroke="#94a3b8" 
+                              width={70}
+                              tick={{ fontWeight: 'bold' }}
+                            />
+                            <Tooltip
+                              formatter={(value: any, name: any) => {
+                                const label = name === 'estudos' ? 'Estudos' : 'Pastas';
+                                return [`${value?.toLocaleString() || '0'}`, label];
+                              }}
+                              contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', color: '#fff' }}
+                              itemStyle={{ fontSize: '10px' }}
+                            />
+                            <Bar dataKey="estudos" fill="#2563eb" radius={[0, 4, 4, 0]} name="Estudos" />
+                            <Bar dataKey="pastas" fill="#94a3b8" radius={[0, 4, 4, 0]} name="Pastas" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
 
