@@ -50,6 +50,55 @@ import {
   LabelList
 } from 'recharts';
 
+// Componente de Input com Máscara Numérica
+function NumericInput({ value, onChange, isFloat = false, className, readOnly, placeholder }: { value: number, onChange: (v: number) => void, isFloat?: boolean, className?: string, readOnly?: boolean, placeholder?: string }) {
+  const [display, setDisplay] = React.useState('');
+
+  React.useEffect(() => {
+    if (isFloat) {
+      setDisplay(value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    } else {
+      setDisplay(value.toLocaleString('pt-BR'));
+    }
+  }, [value, isFloat]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (readOnly) return;
+    const raw = e.target.value;
+    
+    if (isFloat) {
+      const clean = raw.replace(/[^\d,]/g, '');
+      setDisplay(clean);
+      const num = parseFloat(clean.replace(',', '.')) || 0;
+      onChange(num);
+    } else {
+      const clean = raw.replace(/\D/g, '');
+      setDisplay(clean ? Number(clean).toLocaleString('pt-BR') : '');
+      onChange(Number(clean) || 0);
+    }
+  };
+
+  const handleBlur = () => {
+    if (isFloat) {
+      setDisplay(value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    } else {
+      setDisplay(value.toLocaleString('pt-BR'));
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      className={className}
+      value={display}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      readOnly={readOnly}
+      placeholder={placeholder}
+    />
+  );
+}
+
 // AI initialization removed from client side for security.
 // Calls are now routed through /api/ai
 
@@ -62,7 +111,7 @@ export default function Home() {
 }
 
 function DashboardContent() {
-  const { user, signOut } = useAuth();
+  const { user, isGuest, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'migrations'>('overview');
   const { clients, addClient, deleteClient, updateClient } = useClients();
   const { migrations, addMigration, updateMigration, deleteMigration } = useMigrations();
@@ -72,9 +121,11 @@ function DashboardContent() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedMigrationId, setSelectedMigrationId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   const getClientName = (m: any) => {
-    return clients.find(c => c.id === m.clientId)?.name || m.clientName;
+    const client = clients.find(c => c.id === m.clientId);
+    return client?.name || m.clientName || "Cliente Indefinido";
   };
 
   // Stats
@@ -86,15 +137,37 @@ function DashboardContent() {
   ];
 
   // Chart Data Preparation
-  const chartData = migrations.map(m => {
-    const totalEstudos = m.disks?.reduce((acc, d) => acc + (d.estudos || 0), 0) || 0;
-    const totalPastas = m.disks?.reduce((acc, d) => acc + (d.totalPastas || 0), 0) || 0;
-    return {
-      name: getClientName(m),
-      estudos: totalEstudos,
-      pastas: totalPastas,
-    };
-  });
+  // Chart Data Preparation - Aggregated by Client
+  const aggregatedData = migrations.reduce((acc: any, m) => {
+    const rawName = getClientName(m);
+    const clientName = rawName ? rawName.trim() : "Cliente Indefinido";
+    
+    const allDisks = [
+      ...(m.disks || []),
+      ...(m.groups?.flatMap(g => g.disks || []) || [])
+    ];
+    
+    const studies = allDisks.reduce((sum, d) => sum + (Number(d.estudos) || 0), 0);
+    // Sum totalPastas, but if not available, sum pastasRealizadas to ensure SOMETHING shows up if data exists
+    const folders = allDisks.reduce((sum, d) => {
+      const total = Number(d.totalPastas) || 0;
+      const realized = Number(d.pastasRealizadas) || 0;
+      return sum + (total > 0 ? total : realized);
+    }, 0);
+    const volume = allDisks.reduce((sum, d) => sum + (Number(d.storageMapeado) || 0), 0);
+
+    if (!acc[clientName]) {
+      acc[clientName] = { name: clientName, estudos: 0, pastas: 0, volume: 0 };
+    }
+    
+    acc[clientName].estudos += studies;
+    acc[clientName].pastas += folders;
+    acc[clientName].volume += volume;
+    
+    return acc;
+  }, {});
+
+  const chartData = Object.values(aggregatedData);
 
   const statusData = [
     { name: 'Pendente', value: migrations.filter(m => m.status === 'pendente').length, color: '#94a3b8' },
@@ -154,53 +227,69 @@ function DashboardContent() {
           />
         </nav>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-950/30 overflow-hidden">
-          <div className="flex items-center gap-3 px-3 py-2">
-            {user?.photoURL ? (
-              <Image
-                src={user.photoURL}
-                alt="User"
-                width={32}
-                height={32}
-                className="rounded-full border border-slate-700 shrink-0"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs shrink-0">
-                {user?.displayName?.charAt(0)}
-              </div>
-            )}
-            {!isSidebarCollapsed && (
+        <div className="p-4 border-t border-slate-800 bg-slate-950/30 relative">
+          <AnimatePresence>
+            {isProfileMenuOpen && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex-1 min-w-0"
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className={`absolute bottom-full mb-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-30 ${
+                  isSidebarCollapsed ? 'left-4 w-48' : 'left-4 right-4'
+                }`}
               >
-                <p className="text-xs font-bold truncate text-white uppercase tracking-wider">{user?.displayName}</p>
-                <p className="text-[10px] text-slate-500 truncate lowercase font-mono">conectado</p>
+                <div className="p-3 border-b border-slate-700 flex flex-col bg-slate-900/50">
+                  <span className="text-[10px] font-black text-white uppercase tracking-wider truncate">{user?.displayName}</span>
+                  <span className="text-[9px] text-slate-500 font-mono truncate">{user?.email || 'visitante@fluxo.com'}</span>
+                </div>
+                <button
+                  onClick={signOut}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-rose-500/10 hover:text-rose-400 transition-colors text-left"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.1em]">Sair do Sistema</span>
+                </button>
               </motion.div>
             )}
-          </div>
-          <button
-            onClick={signOut}
-            className={`mt-8 flex items-center transition-all duration-300 group/logout ${isSidebarCollapsed
-                ? 'flex-col justify-center py-4 gap-2 w-full rounded-2xl'
-                : 'flex-row gap-4 px-5 py-3 w-full rounded-2xl'
-              } text-slate-500 hover:bg-rose-500/10 hover:text-rose-400`}
-            title="Encerrar Sessão"
+          </AnimatePresence>
+
+          <button 
+            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+            className={`flex items-center transition-all duration-300 w-full rounded-2xl p-2 ${
+              isSidebarCollapsed ? 'justify-center' : 'gap-4 px-3'
+            } ${isProfileMenuOpen ? 'bg-slate-800 shadow-inner' : 'hover:bg-slate-800/50'}`}
           >
-            <LogOut className="w-5 h-5 shrink-0 transition-transform group-logout:scale-110" />
-            <span className={`font-black uppercase tracking-[0.1em] text-center ${isSidebarCollapsed ? 'text-[9px]' : 'text-[10px]'
-              }`}>
-              Sair
-            </span>
+            <div className="relative shrink-0">
+              {user?.photoURL ? (
+                <Image
+                  src={user.photoURL}
+                  alt="User"
+                  width={32}
+                  height={32}
+                  className="rounded-full border border-slate-700"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs">
+                  {user?.displayName?.charAt(0)}
+                </div>
+              )}
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+            </div>
+            
+            {!isSidebarCollapsed && (
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-[10px] font-black truncate text-white uppercase tracking-wider">{user?.displayName}</p>
+                <p className="text-[9px] text-slate-500 truncate lowercase font-mono">conectado</p>
+              </div>
+            )}
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto relative flex flex-col">
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10">
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-50 shadow-sm">
           <div>
             <h2 className="text-xl font-black text-slate-900 font-display">
               {selectedMigration ? `Detalhamento: ${getClientName(selectedMigration)}` : (
@@ -225,7 +314,7 @@ function DashboardContent() {
                 Voltar ao Painel
               </button>
             )}
-            {activeTab === 'clients' && (
+            {activeTab === 'clients' && !isGuest && (
               <button
                 onClick={() => setIsClientModalOpen(true)}
                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm uppercase tracking-tight"
@@ -233,7 +322,7 @@ function DashboardContent() {
                 <Plus className="w-4 h-4" /> Novo Cliente
               </button>
             )}
-            {activeTab === 'migrations' && !selectedMigration && (
+            {activeTab === 'migrations' && !selectedMigration && !isGuest && (
               <button
                 onClick={() => setIsMigrationModalOpen(true)}
                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm uppercase tracking-tight"
@@ -255,6 +344,7 @@ function DashboardContent() {
               >
                 <MigrationDetails
                   migration={selectedMigration}
+                  isGuest={isGuest}
                   onUpdate={(data) => updateMigration(selectedMigration.id!, data)}
                 />
               </motion.div>
@@ -304,7 +394,13 @@ function DashboardContent() {
                           />
                           <YAxis fontSize={10} stroke="#94a3b8" />
                           <Tooltip
-                            formatter={(value: any) => value?.toLocaleString() || '0'}
+                            formatter={(value: any, name: any) => {
+                              const label = name === 'volume' ? 'Volume' : 
+                                            name === 'estudos' ? 'Estudos' : 
+                                            name === 'pastas' ? 'Pastas' : name;
+                              const unit = name === 'volume' ? ' TB' : '';
+                              return [`${value?.toLocaleString() || '0'}${unit}`, label];
+                            }}
                             contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff' }}
                             itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
                           />
@@ -382,7 +478,10 @@ function DashboardContent() {
                                 <StatusBadge status={m.status} />
                               </td>
                               <td className="p-4 text-right pr-6">
-                                <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 group-hover:text-blue-600 transition-all">
+                                <button 
+                                  onClick={() => setSelectedMigrationId(m.id || null)}
+                                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 group-hover:text-blue-600 transition-all"
+                                >
                                   <ChevronRight className="w-4 h-4" />
                                 </button>
                               </td>
@@ -462,25 +561,27 @@ function DashboardContent() {
                             {client.createdAt?.seconds ? format(new Date(client.createdAt.seconds * 1000), 'dd.MM.yyyy') : '...'}
                           </td>
                           <td className="px-6 py-4 text-right pr-12">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => {
-                                  setClientToEdit(client);
-                                  setIsClientModalOpen(true);
-                                }}
-                                className="p-2 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-all"
-                                title="Editar Cliente"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => deleteClient(client.id!)}
-                                className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
-                                title="Remover Cliente"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            {!isGuest && (
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setClientToEdit(client);
+                                    setIsClientModalOpen(true);
+                                  }}
+                                  className="p-2 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-all"
+                                  title="Editar Cliente"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => deleteClient(client.id!)}
+                                  className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
+                                  title="Remover Cliente"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -527,17 +628,19 @@ function DashboardContent() {
                           <td className="px-6 py-4">
                             <div className="flex flex-col items-center gap-1.5">
                               <StatusBadge status={m.status} />
-                              <select
-                                value={m.status}
-                                onChange={(e) => updateMigration(m.id!, { status: e.target.value as any })}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] bg-slate-100 rounded px-1.5 py-0.5 cursor-pointer outline-none border border-slate-200 font-bold uppercase"
-                              >
-                                <option value="pendente">Pendente</option>
-                                <option value="em_progresso">Execução</option>
-                                <option value="pausado">Pausado</option>
-                                <option value="concluida">Concluída</option>
-                                <option value="atrasada">Atraso</option>
-                              </select>
+                              {!isGuest && (
+                                <select
+                                  value={m.status}
+                                  onChange={(e) => updateMigration(m.id!, { status: e.target.value as any })}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] bg-slate-100 rounded px-1.5 py-0.5 cursor-pointer outline-none border border-slate-200 font-bold uppercase"
+                                >
+                                  <option value="pendente">Pendente</option>
+                                  <option value="em_progresso">Execução</option>
+                                  <option value="pausado">Pausado</option>
+                                  <option value="concluida">Concluída</option>
+                                  <option value="atrasada">Atraso</option>
+                                </select>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">
@@ -550,12 +653,14 @@ function DashboardContent() {
                           </td>
                           <td className="px-6 py-4 text-right pr-6">
                             <div className="flex items-center justify-end gap-3">
-                              <button
-                                onClick={() => deleteMigration(m.id!)}
-                                className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-lg transition-all border border-transparent hover:border-rose-100 opacity-0 group-hover:opacity-100"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {!isGuest && (
+                                <button
+                                  onClick={() => deleteMigration(m.id!)}
+                                  className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-lg transition-all border border-transparent hover:border-rose-100 opacity-0 group-hover:opacity-100"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                               <button
                                 onClick={() => setSelectedMigrationId(m.id!)}
                                 className="p-2 hover:bg-blue-50 text-slate-300 hover:text-blue-600 rounded-lg transition-all border border-transparent hover:border-blue-100"
@@ -577,15 +682,17 @@ function DashboardContent() {
         {/* AI Floating Trigger */}
         <button
           onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white p-4 rounded-xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group flex items-center gap-3 z-30"
+          className="fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white w-16 h-16 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-110 active:scale-95 group flex flex-col items-center justify-center z-30"
         >
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-black text-xs uppercase tracking-[0.2em] opacity-80">AI Assistant</span>
-          <MessageSquare className="w-5 h-5 text-blue-500" />
+          <div className="relative mb-1">
+            <MessageSquare className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
+            <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+          </div>
+          <span className="font-black text-[10px] uppercase tracking-[0.15em] opacity-80">IA</span>
         </button>
 
         {/* Modals & AI Panel (Drawer Side) */}
-        <MigrationModal isOpen={isMigrationModalOpen} onClose={() => setIsMigrationModalOpen(false)} clients={clients} onAdd={addMigration} />
+        <MigrationModal isOpen={isMigrationModalOpen} onClose={() => setIsMigrationModalOpen(false)} clients={clients} onAdd={addMigration} isGuest={isGuest} />
         <ClientModal
           isOpen={isClientModalOpen}
           onClose={() => {
@@ -595,8 +702,9 @@ function DashboardContent() {
           onAdd={addClient}
           onUpdate={updateClient}
           clientToEdit={clientToEdit}
+          isGuest={isGuest}
         />
-        <AIChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} migrations={migrations} />
+        <AIChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} migrations={migrations} isGuest={isGuest} />
       </main>
     </div>
   );
@@ -659,7 +767,7 @@ function StatusBadge({ status, minimal = false }: { status: string, minimal?: bo
 }
 
 // Modal Components
-function ClientModal({ isOpen, onClose, onAdd, onUpdate, clientToEdit }: { isOpen: boolean, onClose: () => void, onAdd: (c: any) => Promise<void>, onUpdate?: (id: string, data: any) => Promise<void>, clientToEdit?: any }) {
+function ClientModal({ isOpen, onClose, onAdd, onUpdate, clientToEdit, isGuest }: { isOpen: boolean, onClose: () => void, onAdd: (c: any) => Promise<void>, onUpdate?: (id: string, data: any) => Promise<void>, clientToEdit?: any, isGuest: boolean }) {
   const [formData, setFormData] = useState({ name: '', email: '', company: '' });
 
   useEffect(() => {
@@ -691,7 +799,8 @@ function ClientModal({ isOpen, onClose, onAdd, onUpdate, clientToEdit }: { isOpe
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nome Completo</label>
             <input
               type="text"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+              disabled={isGuest}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all disabled:opacity-50"
               placeholder="Ex: João da Silva"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -701,7 +810,8 @@ function ClientModal({ isOpen, onClose, onAdd, onUpdate, clientToEdit }: { isOpe
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">E-mail Corporativo</label>
             <input
               type="email"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+              disabled={isGuest}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all disabled:opacity-50"
               placeholder="exemplo@email.com"
               value={formData.email}
               onChange={e => setFormData({ ...formData, email: e.target.value })}
@@ -711,7 +821,8 @@ function ClientModal({ isOpen, onClose, onAdd, onUpdate, clientToEdit }: { isOpe
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Empresa / Unidade</label>
             <input
               type="text"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+              disabled={isGuest}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all disabled:opacity-50"
               placeholder="Ex: Tech Solutions"
               value={formData.company}
               onChange={e => setFormData({ ...formData, company: e.target.value })}
@@ -719,28 +830,32 @@ function ClientModal({ isOpen, onClose, onAdd, onUpdate, clientToEdit }: { isOpe
           </div>
         </div>
         <div className="flex gap-3 mt-8">
-          <button onClick={onClose} className="flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">Cancelar</button>
-          <button
-            onClick={async () => {
-              if (clientToEdit && onUpdate) {
-                await onUpdate(clientToEdit.id, formData);
-              } else {
-                await onAdd(formData);
-              }
-              onClose();
-              setFormData({ name: '', email: '', company: '' });
-            }}
-            className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95"
-          >
-            {clientToEdit ? 'Atualizar' : 'Cadastrar'}
+          <button onClick={onClose} className="flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">
+            {isGuest ? 'Fechar' : 'Cancelar'}
           </button>
+          {!isGuest && (
+            <button
+              onClick={async () => {
+                if (clientToEdit && onUpdate) {
+                  await onUpdate(clientToEdit.id, formData);
+                } else {
+                  await onAdd(formData);
+                }
+                onClose();
+                setFormData({ name: '', email: '', company: '' });
+              }}
+              className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95"
+            >
+              {clientToEdit ? 'Atualizar' : 'Cadastrar'}
+            </button>
+          )}
         </div>
       </motion.div>
     </div>
   );
 }
 
-function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, onClose: () => void, clients: any[], onAdd: (m: any) => Promise<void> }) {
+function MigrationModal({ isOpen, onClose, clients, onAdd, isGuest }: { isOpen: boolean, onClose: () => void, clients: any[], onAdd: (m: any) => Promise<void>, isGuest: boolean }) {
   const [formData, setFormData] = useState({
     clientId: '',
     description: '',
@@ -755,6 +870,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
   if (!isOpen) return null;
 
   const addGroup = () => {
+    if (isGuest) return;
     setFormData({
       ...formData,
       groups: [...formData.groups, { id: crypto.randomUUID(), title: 'Nova Unidade', disks: [] }]
@@ -762,6 +878,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
   };
 
   const removeGroup = (groupId: string) => {
+    if (isGuest) return;
     setFormData({
       ...formData,
       groups: formData.groups.filter(g => g.id !== groupId)
@@ -769,6 +886,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
   };
 
   const updateGroupTitle = (groupId: string, title: string) => {
+    if (isGuest) return;
     setFormData({
       ...formData,
       groups: formData.groups.map(g => g.id === groupId ? { ...g, title } : g)
@@ -776,6 +894,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
   };
 
   const addDiskToGroup = (groupId: string) => {
+    if (isGuest) return;
     setFormData({
       ...formData,
       groups: formData.groups.map(g => g.id === groupId ? {
@@ -789,6 +908,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
   };
 
   const removeDiskFromGroup = (groupId: string, diskIdx: number) => {
+    if (isGuest) return;
     setFormData({
       ...formData,
       groups: formData.groups.map(g => g.id === groupId ? {
@@ -799,6 +919,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
   };
 
   const updateDiskInGroup = (groupId: string, diskIdx: number, data: Partial<Disk>) => {
+    if (isGuest) return;
     setFormData({
       ...formData,
       groups: formData.groups.map(g => g.id === groupId ? {
@@ -809,6 +930,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, groupId: string) => {
+    if (isGuest) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -913,7 +1035,8 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
           <div className="col-span-2 md:col-span-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Cliente Alvo</label>
             <select
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none appearance-none"
+              disabled={isGuest}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none appearance-none disabled:opacity-50"
               value={formData.clientId}
               onChange={e => setFormData({ ...formData, clientId: e.target.value })}
             >
@@ -925,18 +1048,19 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
           <div className="col-span-2 md:col-span-1 grid grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Data Início</label>
-              <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
+              <input type="date" disabled={isGuest} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none disabled:opacity-50" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Data Previsão</label>
-              <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
+              <input type="date" disabled={isGuest} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none disabled:opacity-50" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
             </div>
           </div>
 
           <div className="col-span-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Escopo e Especificação</label>
             <textarea
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none min-h-[60px] transition-all"
+              disabled={isGuest}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-600 outline-none min-h-[60px] transition-all disabled:opacity-50"
               placeholder="Descreva o escopo técnico..."
               value={formData.description}
               onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -946,12 +1070,14 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
           <div className="col-span-2 space-y-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Configuração de Unidades e Discos</label>
-              <button 
-                onClick={addGroup}
-                className="text-[10px] bg-slate-900 text-white px-4 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" /> Adicionar Unidade
-              </button>
+              {!isGuest && (
+                <button 
+                  onClick={addGroup}
+                  className="text-[10px] bg-slate-900 text-white px-4 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Adicionar Unidade
+                </button>
+              )}
             </div>
 
             <div className="space-y-6">
@@ -960,23 +1086,28 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
                   <div className="flex justify-between items-center gap-4">
                     <input 
                       type="text" 
-                      className="flex-1 bg-white border border-slate-200 rounded-lg p-2 text-xs font-black uppercase tracking-tight outline-none focus:ring-2 focus:ring-blue-600"
+                      disabled={isGuest}
+                      className="flex-1 bg-white border border-slate-200 rounded-lg p-2 text-xs font-black uppercase tracking-tight outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50"
                       value={group.title}
                       onChange={e => updateGroupTitle(group.id, e.target.value)}
                       placeholder="Nome da Unidade (ex: Matriz, Setor A)"
                     />
                     <div className="flex gap-2">
-                      <label className="text-[10px] bg-blue-600 text-white px-3 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm">
-                        <FileUp className="w-3.5 h-3.5" /> Importar
-                        <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
-                      </label>
-                      <button 
-                        onClick={() => addDiskToGroup(group.id)}
-                        className="text-[10px] bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Disco
-                      </button>
-                      {formData.groups.length > 1 && (
+                      {!isGuest && (
+                        <>
+                          <label className="text-[10px] bg-blue-600 text-white px-3 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm">
+                            <FileUp className="w-3.5 h-3.5" /> Importar
+                            <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
+                          </label>
+                          <button 
+                            onClick={() => addDiskToGroup(group.id)}
+                            className="text-[10px] bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Disco
+                          </button>
+                        </>
+                      )}
+                      {!isGuest && formData.groups.length > 1 && (
                         <button onClick={() => removeGroup(group.id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                       )}
                     </div>
@@ -987,23 +1118,26 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
                       <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-100 group">
                         <input
                           type="text"
+                          disabled={isGuest}
                           placeholder="Caminho / Host"
-                          className="flex-1 bg-transparent text-[11px] font-mono outline-none"
+                          className="flex-1 bg-transparent text-[11px] font-mono outline-none disabled:opacity-50"
                           value={disk.path}
                           onChange={e => updateDiskInGroup(group.id, idx, { path: e.target.value })}
                         />
                         <div className="flex items-center gap-4">
                           <div className="flex flex-col items-end">
                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">TB Total</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="w-12 bg-slate-50 border border-slate-200 rounded text-right p-0.5 text-[10px] outline-none"
+                            <NumericInput
+                              isFloat
+                              readOnly={isGuest}
+                              className="w-12 bg-slate-50 border border-slate-200 rounded text-right p-0.5 text-[10px] outline-none disabled:opacity-50"
                               value={disk.storageMapeado}
-                              onChange={e => updateDiskInGroup(group.id, idx, { storageMapeado: Number(e.target.value) })}
+                              onChange={v => updateDiskInGroup(group.id, idx, { storageMapeado: v })}
                             />
                           </div>
-                          <button onClick={() => removeDiskFromGroup(group.id, idx)} className="p-1 text-slate-300 hover:text-rose-600 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                          {!isGuest && (
+                            <button onClick={() => removeDiskFromGroup(group.id, idx)} className="p-1 text-slate-300 hover:text-rose-600 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1018,31 +1152,35 @@ function MigrationModal({ isOpen, onClose, clients, onAdd }: { isOpen: boolean, 
         </div>
 
         <div className="flex gap-3 mt-8 pt-6 border-t border-slate-100">
-          <button onClick={onClose} className="flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">Cancelar</button>
-          <button
-            disabled={!formData.clientId}
-            onClick={async () => {
-              const client = clients.find(c => c.id === formData.clientId);
-              await onAdd({ ...formData, clientName: client?.name || 'Cliente' });
-              onClose();
-            }}
-            className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:opacity-30"
-          >
-            Executar Projeto
+          <button onClick={onClose} className="flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">
+            {isGuest ? 'Fechar' : 'Cancelar'}
           </button>
+          {!isGuest && (
+            <button
+              disabled={!formData.clientId}
+              onClick={async () => {
+                const client = clients.find(c => c.id === formData.clientId);
+                await onAdd({ ...formData, clientName: client?.name || 'Cliente' });
+                onClose();
+              }}
+              className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:opacity-30"
+            >
+              Executar Projeto
+            </button>
+          )}
         </div>
       </motion.div>
     </div>
   );
 }
 
-function AIChatDrawer({ isOpen, onClose, migrations }: { isOpen: boolean, onClose: () => void, migrations: any[] }) {
+function AIChatDrawer({ isOpen, onClose, migrations, isGuest }: { isOpen: boolean, onClose: () => void, migrations: any[], isGuest: boolean }) {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || isGuest) return;
 
     const userMsg = input.trim();
     setInput('');
@@ -1133,15 +1271,16 @@ function AIChatDrawer({ isOpen, onClose, migrations }: { isOpen: boolean, onClos
               <div className="relative flex items-center">
                 <input
                   type="text"
-                  placeholder="Instrução analítica..."
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg py-4 pl-4 pr-12 text-xs text-slate-200 focus:outline-none focus:border-blue-500 placeholder-slate-600 shadow-inner transition-colors"
+                  disabled={isGuest}
+                  placeholder={isGuest ? "Interação desabilitada para visitantes" : "Instrução analítica..."}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg py-4 pl-4 pr-12 text-xs text-slate-200 focus:outline-none focus:border-blue-500 placeholder-slate-600 shadow-inner transition-colors disabled:opacity-50"
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyPress={e => e.key === 'Enter' && sendMessage()}
                 />
                 <button
                   onClick={sendMessage}
-                  disabled={!input.trim() || loading}
+                  disabled={!input.trim() || loading || isGuest}
                   className="absolute right-2 p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all active:scale-90 disabled:opacity-30"
                 >
                   <Send className="w-4 h-4" />
@@ -1167,7 +1306,7 @@ function LoaderPulse() {
 }
 
 // Detailed Migration View
-function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (data: any) => Promise<void> }) {
+function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, onUpdate: (data: any) => Promise<void>, isGuest: boolean }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedGroups, setEditedGroups] = useState<DiskGroup[]>(
     migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }])
@@ -1190,6 +1329,8 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
       return acc + Math.min(realized, total);
     }, 0),
     estudosEnviados: allDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0),
+    storageMapeado: allDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0),
+    storageEnviado: allDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0),
     progresso: 0
   };
 
@@ -1198,21 +1339,25 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
   summary.progresso = total > 0 ? Number(((realized / total) * 100).toFixed(2)) : 0;
 
   const addGroup = () => {
+    if (isGuest) return;
     setEditedGroups([...editedGroups, { id: crypto.randomUUID(), title: 'Nova Unidade', disks: [] }]);
     setIsEditing(true);
   };
 
   const removeGroup = (groupId: string) => {
+    if (isGuest) return;
     setEditedGroups(editedGroups.filter(g => g.id !== groupId));
     setIsEditing(true);
   };
 
   const updateGroupTitle = (groupId: string, title: string) => {
+    if (isGuest) return;
     setEditedGroups(editedGroups.map(g => g.id === groupId ? { ...g, title } : g));
     setIsEditing(true);
   };
 
   const addDiskToGroup = (groupId: string) => {
+    if (isGuest) return;
     setEditedGroups(editedGroups.map(g => g.id === groupId ? {
       ...g,
       disks: [...g.disks, {
@@ -1224,6 +1369,7 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
   };
 
   const removeDiskFromGroup = (groupId: string, diskIdx: number) => {
+    if (isGuest) return;
     setEditedGroups(editedGroups.map(g => g.id === groupId ? {
       ...g,
       disks: g.disks.filter((_: Disk, i: number) => i !== diskIdx)
@@ -1232,6 +1378,7 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
   };
 
   const updateDiskInGroup = (groupId: string, diskIdx: number, data: Partial<Disk>) => {
+    if (isGuest) return;
     setEditedGroups(editedGroups.map(g => g.id === groupId ? {
       ...g,
       disks: g.disks.map((d: Disk, i: number) => i === diskIdx ? { ...d, ...data } : d)
@@ -1327,11 +1474,13 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
   };
 
   const handleSave = async () => {
+    if (isGuest) return;
     await onUpdate({ groups: editedGroups });
     setIsEditing(false);
   };
 
   const generateAISummary = async () => {
+    if (isGuest) return;
     try {
       const diskContext = allDisks.map(d => `- Caminho: ${d.path}, Status: ${d.status}, Pastas: ${d.pastasRealizadas}/${d.totalPastas}, Storage: ${d.storageEnviado}/${d.storageMapeado} TB`).join('\n');
       const prompt = `Gere um resumo executivo técnico curto (máximo 4 parágrafos) para a migração do cliente ${migration.clientName}. 
@@ -1354,49 +1503,78 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-        {/* Summary Card */}
-        <div className="lg:col-span-1 border border-blue-200 rounded-lg overflow-hidden shadow-sm h-fit bg-white">
-          <div className="bg-blue-600/20 px-4 py-2 border-b border-blue-200 flex justify-between items-center">
-            <h3 className="text-sm font-black text-blue-900 uppercase tracking-tighter">Resumo Executivo</h3>
-            <Sparkles className="w-4 h-4 text-blue-600 cursor-pointer hover:scale-110 transition-transform" onClick={generateAISummary} />
-          </div>
-          <div className="p-4 space-y-4">
-            <div className="flex justify-between items-center text-xs border-b border-slate-100 pb-2">
-              <span className="font-bold text-slate-500">Total de pastas</span>
-              <span className="font-mono text-slate-900 font-black">{summary.totalPastas.toLocaleString()}</span>
+    <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Resumo Executivo Horizontal */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-slate-900 px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              <BarChart3 className="w-4 h-4 text-white" />
             </div>
-            <div className="flex justify-between items-center text-xs border-b border-slate-100 pb-2">
-              <span className="font-bold text-slate-500">Pastas Realizadas</span>
-              <span className="font-mono text-slate-900 font-black">{summary.pastasRealizadas.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between items-center text-xs border-b border-slate-100 pb-2">
-              <span className="font-bold text-slate-500">Estudos enviados</span>
-              <span className="font-mono text-slate-900 font-black">{summary.estudosEnviados.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-bold text-slate-500">Progresso</span>
-              <span className="font-mono text-blue-600 font-black">{summary.progresso}%</span>
+            <div>
+              <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Resumo Executivo do Projeto</h3>
+              <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-0.5">Indicadores de Performance e Volumetria</p>
             </div>
           </div>
-          {isEditing && (
-            <div className="p-4 bg-slate-50 border-t border-slate-100">
-              <button
-                onClick={handleSave}
-                className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
-              >
-                <CheckCircle2 className="w-4 h-4" /> Salvar Alterações
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+             {isEditing && (
+                <button
+                  onClick={handleSave}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 border border-emerald-500/50"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Salvar Alterações
+                </button>
+             )}
+             <button 
+               onClick={generateAISummary}
+               className="flex items-center gap-2 bg-slate-800 text-blue-400 px-4 py-2 rounded-lg hover:bg-slate-700 transition-all text-[10px] font-black uppercase tracking-widest border border-slate-700 shadow-sm"
+             >
+               <Sparkles className="w-4 h-4" /> Gerar Insight IA
+             </button>
+          </div>
         </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-slate-100 bg-white">
+          <div className="p-6 flex flex-col items-center text-center">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Total de Pastas</span>
+            <span className="text-2xl font-black text-slate-900 tracking-tighter">{summary.totalPastas.toLocaleString()}</span>
+          </div>
+          <div className="p-6 flex flex-col items-center text-center">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Pastas Realizadas</span>
+            <span className="text-2xl font-black text-emerald-600 tracking-tighter">{summary.pastasRealizadas.toLocaleString()}</span>
+          </div>
+          <div className="p-6 flex flex-col items-center text-center">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Estudos Enviados</span>
+            <span className="text-2xl font-black text-slate-900 tracking-tighter">{summary.estudosEnviados.toLocaleString()}</span>
+          </div>
+          <div className="p-6 flex flex-col items-center text-center">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Mapeado (TB)</span>
+            <span className="text-2xl font-black text-blue-600 tracking-tighter">{summary.storageMapeado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="p-6 flex flex-col items-center text-center">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Enviado (TB)</span>
+            <span className="text-2xl font-black text-blue-600 tracking-tighter">{summary.storageEnviado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="p-6 flex flex-col items-center justify-center bg-slate-50/50">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Progresso Total</span>
+            <div className="flex items-center gap-3">
+               <span className="text-3xl font-black text-blue-600 tracking-tighter">{summary.progresso}%</span>
+               <div className="w-12 h-12 relative">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                    <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-200" strokeWidth="4" />
+                    <circle cx="18" cy="18" r="16" fill="none" className="stroke-blue-600 transition-all duration-1000" strokeWidth="4" strokeDasharray={`${summary.progresso}, 100`} strokeLinecap="round" />
+                  </svg>
+               </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        {/* Groups and Tables Section */}
-        <div className="lg:col-span-4 space-y-12">
+      {/* Groups and Tables Section */}
+      <div className="space-y-12">
           {editedGroups.map((group) => (
             <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-20 backdrop-blur-sm">
+              <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                 <div className="flex items-center gap-4 flex-1">
                   {isEditing ? (
                     <input 
@@ -1415,17 +1593,21 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
                 </div>
                 
                 <div className="flex gap-2">
-                  <label className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
-                    <FileUp className="w-3.5 h-3.5" /> Importar
-                    <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
-                  </label>
-                  <button 
-                    onClick={() => addDiskToGroup(group.id)}
-                    className="text-[10px] bg-slate-900 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Disco
-                  </button>
-                  {isEditing && editedGroups.length > 1 && (
+                  {!isGuest && (
+                    <>
+                      <label className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
+                        <FileUp className="w-3.5 h-3.5" /> Importar
+                        <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
+                      </label>
+                      <button 
+                        onClick={() => addDiskToGroup(group.id)}
+                        className="text-[10px] bg-slate-900 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Disco
+                      </button>
+                    </>
+                  )}
+                  {!isGuest && isEditing && editedGroups.length > 1 && (
                     <button 
                       onClick={() => removeGroup(group.id)}
                       className="text-[10px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
@@ -1475,6 +1657,7 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
                         </td>
                         <td className="p-4 text-center">
                           <select 
+                            disabled={isGuest}
                             className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${
                               d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                               d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
@@ -1491,30 +1674,38 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
                           </select>
                         </td>
                         <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <input type="number" className="w-full bg-transparent text-center" value={d.pastasRealizadas} onChange={e => updateDiskInGroup(group.id, i, { pastasRealizadas: Number(e.target.value) })} />
+                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.pastasRealizadas} onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })} />
                         </td>
                         <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <input type="number" className="w-full bg-transparent text-center" value={d.estudos} onChange={e => updateDiskInGroup(group.id, i, { estudos: Number(e.target.value) })} />
+                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.estudos} onChange={v => updateDiskInGroup(group.id, i, { estudos: v })} />
                         </td>
                         <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <input type="number" className="w-full bg-transparent text-center" value={d.send} onChange={e => updateDiskInGroup(group.id, i, { send: Number(e.target.value) })} />
+                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.send} onChange={v => updateDiskInGroup(group.id, i, { send: v })} />
                         </td>
                         <td className="p-4 text-center text-xs font-mono font-black text-slate-400">
-                          <input type="number" className="w-full bg-transparent text-center" value={d.totalPastas} onChange={e => updateDiskInGroup(group.id, i, { totalPastas: Number(e.target.value) })} />
+                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.totalPastas} onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })} />
                         </td>
                         <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-400">
-                          <input type="number" step="0.01" className="w-12 bg-transparent text-right" value={d.storageMapeado} onChange={e => updateDiskInGroup(group.id, i, { storageMapeado: Number(e.target.value) })} /> TB
+                          <div className="flex items-center justify-end gap-1">
+                            <NumericInput isFloat readOnly={isGuest} className="w-12 bg-transparent text-right outline-none" value={d.storageMapeado} onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v })} />
+                            <span>TB</span>
+                          </div>
                         </td>
                         <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
-                          <input type="number" step="0.01" className="w-12 bg-transparent text-right" value={d.storageEnviado} onChange={e => updateDiskInGroup(group.id, i, { storageEnviado: Number(e.target.value) })} /> TB
+                          <div className="flex items-center justify-end gap-1">
+                            <NumericInput isFloat readOnly={isGuest} className="w-12 bg-transparent text-right outline-none" value={d.storageEnviado} onChange={v => updateDiskInGroup(group.id, i, { storageEnviado: v })} />
+                            <span>TB</span>
+                          </div>
                         </td>
                         <td className="p-4 text-right pr-6">
-                          <button 
-                            onClick={() => removeDiskFromGroup(group.id, i)}
-                            className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/row:opacity-100"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {!isGuest && (
+                            <button 
+                              onClick={() => removeDiskFromGroup(group.id, i)}
+                              className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/row:opacity-100"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1524,22 +1715,24 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
             </div>
           ))}
           
-          <button 
-            onClick={addGroup}
-            className="w-full py-8 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
-          >
-            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-all">
-              <Plus className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-black uppercase tracking-widest">Adicionar Nova Unidade / Grupo de Discos</span>
-          </button>
+          {!isGuest && (
+            <button 
+              onClick={addGroup}
+              className="w-full py-8 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center gap-2 group"
+            >
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-all">
+                <Plus className="w-6 h-6" />
+              </div>
+              <span className="text-xs font-black uppercase tracking-widest">Adicionar Nova Unidade / Grupo de Discos</span>
+            </button>
+          )}
         </div>
-      </div>
 
       {/* Detail Chart */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-[300px]">
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-[450px] flex flex-col">
         <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight mb-6">Curva de Transferência (Storage)</h3>
-        <ResponsiveContainer width="100%" height="100%">
+        <div className="flex-1 min-h-0">
+          <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={allDisks}>
             <defs>
               <linearGradient id="colorMapeado" x1="0" y1="0" x2="0" y2="1">
@@ -1561,5 +1754,6 @@ function MigrationDetails({ migration, onUpdate }: { migration: any, onUpdate: (
         </ResponsiveContainer>
       </div>
     </div>
+  </div>
   );
 }
