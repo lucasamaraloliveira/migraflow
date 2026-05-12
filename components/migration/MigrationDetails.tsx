@@ -59,13 +59,14 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
 
   // Security: Delete Confirmation & Undo
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ groupId: string, idx: number, type: 'disk' | 'laudo' } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ groupId: string, idx?: number, type: 'disk' | 'laudo' | 'group' } | null>(null);
   const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ groupId: string, type: 'all' } | null>(null);
   const [lastDeletedDisk, setLastDeletedDisk] = useState<{ groupId: string, disk: Disk, idx: number } | null>(null);
   const [lastDeletedLaudo, setLastDeletedLaudo] = useState<{ groupId: string, laudo: Laudo, idx: number } | null>(null);
+  const [lastDeletedGroup, setLastDeletedGroup] = useState<{ group: DiskGroup, idx: number } | null>(null);
   const [lastBulkDelete, setLastBulkDelete] = useState<{ groupId: string, data: { disks: Disk[], laudos: Laudo[] } } | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
-  const [undoType, setUndoType] = useState<'disk' | 'laudo' | 'bulk'>('disk');
+  const [undoType, setUndoType] = useState<'disk' | 'laudo' | 'bulk' | 'group'>('disk');
 
   useEffect(() => {
     setEditedGroups(migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }]));
@@ -132,10 +133,10 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
     setIsEditing(true);
   };
 
-  const removeGroup = (groupId: string) => {
+  const askRemoveGroup = (groupId: string) => {
     if (isGuest) return;
-    setEditedGroups(editedGroups.filter(g => g.id !== groupId));
-    setIsEditing(true);
+    setDeleteTarget({ groupId, type: 'group' });
+    setIsDeleteConfirmOpen(true);
   };
 
   const updateGroupTitle = (groupId: string, title: string) => {
@@ -178,25 +179,34 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
     if (!deleteTarget || isGuest) return;
     const { groupId, idx, type } = deleteTarget;
 
-    const group = editedGroups.find(g => g.id === groupId);
-    if (!group) return;
-
-    if (type === 'disk') {
-      const diskToDelete = group.disks[idx];
-      setLastDeletedDisk({ groupId, disk: diskToDelete, idx });
-      setUndoType('disk');
-      setEditedGroups(editedGroups.map(g => g.id === groupId ? {
-        ...g,
-        disks: g.disks.filter((_: Disk, i: number) => i !== idx)
-      } : g));
+    if (type === 'group') {
+      const gIdx = editedGroups.findIndex(g => g.id === groupId);
+      if (gIdx === -1) return;
+      const groupToDelete = editedGroups[gIdx];
+      setLastDeletedGroup({ group: groupToDelete, idx: gIdx });
+      setUndoType('group');
+      setEditedGroups(editedGroups.filter(g => g.id !== groupId));
     } else {
-      const laudoToDelete = (group.laudos || [])[idx];
-      setLastDeletedLaudo({ groupId, laudo: laudoToDelete, idx });
-      setUndoType('laudo');
-      setEditedGroups(editedGroups.map(g => g.id === groupId ? {
-        ...g,
-        laudos: (group.laudos || []).filter((_: Laudo, i: number) => i !== idx)
-      } : g));
+      const group = editedGroups.find(g => g.id === groupId);
+      if (!group || idx === undefined) return;
+
+      if (type === 'disk') {
+        const diskToDelete = group.disks[idx];
+        setLastDeletedDisk({ groupId, disk: diskToDelete, idx });
+        setUndoType('disk');
+        setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+          ...g,
+          disks: g.disks.filter((_: Disk, i: number) => i !== idx)
+        } : g));
+      } else {
+        const laudoToDelete = (group.laudos || [])[idx];
+        setLastDeletedLaudo({ groupId, laudo: laudoToDelete, idx });
+        setUndoType('laudo');
+        setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+          ...g,
+          laudos: (group.laudos || []).filter((_: Laudo, i: number) => i !== idx)
+        } : g));
+      }
     }
 
     setIsEditing(true);
@@ -242,6 +252,12 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
         laudos: [...(g.laudos || []).slice(0, idx), laudo, ...(g.laudos || []).slice(idx)]
       } : g));
       setLastDeletedLaudo(null);
+    } else if (undoType === 'group' && lastDeletedGroup) {
+      const { group, idx } = lastDeletedGroup;
+      const newGroups = [...editedGroups];
+      newGroups.splice(idx, 0, group);
+      setEditedGroups(newGroups);
+      setLastDeletedGroup(null);
     } else if (undoType === 'bulk' && lastBulkDelete) {
       const { groupId, data } = lastBulkDelete;
       setEditedGroups(editedGroups.map(g => g.id === groupId ? { ...g, disks: data.disks, laudos: data.laudos } : g));
@@ -535,8 +551,8 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
             <button
               onClick={() => onUpdate({ isIncremental: !migration.isIncremental })}
               className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${migration.isIncremental
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                : 'bg-slate-800 text-slate-400 border border-slate-700'
                 }`}
             >
               {migration.isIncremental ? 'Cenário Incremental: ATIVO' : 'Cenário Incremental: INATIVO'}
@@ -547,6 +563,52 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
             <button onClick={generateAISummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all">IA Insight</button>
           </div>
         </div>
+        <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Estudos</p>
+            <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.estudosEnviados.toLocaleString()}</h4>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Volume Mapeado</p>
+            <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.storageMapeado.toFixed(2)} <span className="text-xs text-slate-400">TB</span></h4>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Volume Enviado</p>
+            <h4 className="text-2xl font-black text-emerald-600 tracking-tighter">{summary.storageEnviado.toFixed(2)} <span className="text-xs text-slate-400">TB</span></h4>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso Global</p>
+            <div className="flex items-end gap-2">
+              <h4 className={`text-2xl font-black tracking-tighter ${summary.progresso === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{summary.progresso}%</h4>
+              <div className="w-full h-1.5 bg-slate-200 rounded-full mb-2 overflow-hidden">
+                <div className={`h-full ${summary.progresso === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${summary.progresso}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+        {laudosSummary.total > 0 && (
+          <div className="px-6 pb-6 pt-0">
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Resumo de Laudos Clínicos</p>
+                  <p className="text-xs font-bold text-amber-600">{laudosSummary.realizados} de {laudosSummary.total} realizados</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-xl font-black text-amber-700">{laudosSummary.progresso}%</p>
+                </div>
+                <div className="w-32 h-2 bg-amber-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-500" style={{ width: `${laudosSummary.progresso}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-12">
@@ -566,15 +628,6 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                     />
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Identificador de Unidade</span>
                   </div>
-                  {!isGuest && editedGroups.length > 1 && (
-                    <button
-                      onClick={() => removeGroup(group.id)}
-                      className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all active:scale-95 group/del shrink-0"
-                      title="Remover Unidade Inteira"
-                    >
-                      <Trash2 className="w-4 h-4 group-hover/del:scale-110 transition-transform" />
-                    </button>
-                  )}
                 </div>
 
                 {!isGuest && (
@@ -595,17 +648,70 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                     >
                       <Plus className="w-3 h-3" /> Add Laudo
                     </button>
+                    
+                    {/* Only show 'Limpar Tudo' if there is something to clear */}
+                    {(group.disks.length > 0 || (group.laudos && group.laudos.length > 0)) && (
+                      <>
+                        <div className="w-px h-4 bg-slate-200 mx-1 hidden md:block" />
+                        <button
+                          onClick={() => clearAllData(group.id)}
+                          className="whitespace-nowrap text-[9px] text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                          title="Apagar todos os dados desta unidade (Discos e Laudos)"
+                        >
+                          <Trash2 className="w-3 h-3" /> Limpar Tudo
+                        </button>
+                      </>
+                    )}
+
                     <div className="w-px h-4 bg-slate-200 mx-1 hidden md:block" />
                     <button
-                      onClick={() => clearAllData(group.id)}
-                      className="whitespace-nowrap text-[9px] text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest transition-all flex items-center gap-2"
-                      title="Apagar todos os dados desta unidade (Discos e Laudos)"
+                      onClick={() => {
+                        const hasData = group.disks.length > 0 || (group.laudos && group.laudos.length > 0);
+                        if (hasData) return;
+                        askRemoveGroup(group.id);
+                      }}
+                      disabled={group.disks.length > 0 || (group.laudos && group.laudos.length > 0)}
+                      className={`p-2 rounded-lg transition-all shrink-0 ${group.disks.length > 0 || (group.laudos && group.laudos.length > 0)
+                        ? 'text-slate-200 cursor-not-allowed opacity-50'
+                        : 'text-slate-300 hover:text-rose-600 hover:bg-rose-50 active:scale-95 group/del'
+                        }`}
+                      title={group.disks.length > 0 || (group.laudos && group.laudos.length > 0)
+                        ? "Limpe todos os dados desta unidade para poder excluí-la"
+                        : "Remover Unidade Inteira"
+                      }
                     >
-                      <Trash2 className="w-3 h-3" /> Limpar Tudo
+                      <Trash2 className="w-4 h-4 group-hover/del:scale-110 transition-transform" />
                     </button>
                   </div>
                 )}
               </div>
+
+              {/* Unit Summary Section - Only show if there are disks or laudos */}
+              {(group.disks.length > 0 || (group.laudos && group.laudos.length > 0)) && (
+                <div className="bg-slate-50/50 p-4 border-b border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudos</p>
+                    <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.estudosEnviados.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mapeado (TB)</p>
+                    <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.storageMapeado.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Enviado (TB)</p>
+                    <p className="text-lg font-black text-emerald-600 tracking-tighter">{groupSummary.storageEnviado.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso Unidade</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-lg font-black tracking-tighter ${groupSummary.progresso >= 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{groupSummary.progresso}%</span>
+                      <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full ${groupSummary.progresso >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${groupSummary.progresso}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {group.disks.length > 0 && (
                 <div className="grid grid-cols-1 gap-3 p-4 md:hidden bg-slate-50/30">
@@ -905,7 +1011,7 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
               )}
 
               {/* Laudos Table Section */}
-              {((group.laudos && group.laudos.length > 0) || group.disks.length === 0) && (
+              {group.laudos && group.laudos.length > 0 && (
                 <div className={`mt-0 pt-0 ${group.disks.length > 0 ? 'mt-8 pt-8 border-t border-slate-100' : ''}`}>
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 px-6 pt-6">
                     <div className="flex items-center gap-3">
@@ -1473,14 +1579,16 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
               </div>
               <div>
                 <p className="text-xs font-black uppercase tracking-widest text-white">
-                  {undoType === 'bulk' ? 'Dados Removidos' : undoType === 'disk' ? 'Disco Excluído' : 'Laudo Excluído'}
+                  {undoType === 'group' ? 'Unidade Removida' : undoType === 'bulk' ? 'Dados Removidos' : undoType === 'disk' ? 'Disco Excluído' : 'Laudo Excluído'}
                 </p>
                 <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">
-                  {undoType === 'bulk'
-                    ? 'Todos os dados da unidade foram limpos'
-                    : undoType === 'disk'
-                      ? (lastDeletedDisk?.disk.path || 'Sem caminho')
-                      : (lastDeletedLaudo?.laudo.periodo || 'Sem período')
+                  {undoType === 'group'
+                    ? (lastDeletedGroup?.group.title || 'Sem título')
+                    : undoType === 'bulk'
+                      ? 'Todos os dados da unidade foram limpos'
+                      : undoType === 'disk'
+                        ? (lastDeletedDisk?.disk.path || 'Sem caminho')
+                        : (lastDeletedLaudo?.laudo.periodo || 'Sem período')
                   }
                 </p>
               </div>
@@ -1523,15 +1631,17 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">
                   {bulkDeleteTarget
                     ? 'Limpar Toda Unidade?'
-                    : deleteTarget?.type === 'disk' ? 'Excluir Disco?' : 'Excluir Laudo?'
+                    : deleteTarget?.type === 'group' ? 'Remover Unidade?' : deleteTarget?.type === 'disk' ? 'Excluir Disco?' : 'Excluir Laudo?'
                   }
                 </h2>
                 <p className="text-sm text-slate-500 leading-relaxed font-medium">
                   {bulkDeleteTarget
                     ? 'Tem certeza que deseja remover TODOS os dados desta unidade? Esta ação pode ser desfeita.'
-                    : deleteTarget?.type === 'disk'
-                      ? "Esta ação removerá o disco e todas as métricas associadas. Deseja continuar?"
-                      : "Esta ação removerá o registro do laudo deste período. Deseja continuar?"
+                    : deleteTarget?.type === 'group'
+                      ? 'Isso removerá a unidade inteira, incluindo todos os discos e laudos. Deseja continuar?'
+                      : deleteTarget?.type === 'disk'
+                        ? "Esta ação removerá o disco e todas as métricas associadas. Deseja continuar?"
+                        : "Esta ação removerá o registro do laudo deste período. Deseja continuar?"
                   }
                 </p>
               </div>
