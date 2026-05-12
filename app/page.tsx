@@ -56,7 +56,8 @@ import {
   Line,
   AreaChart,
   Area,
-  LabelList
+  LabelList,
+  ComposedChart
 } from 'recharts';
 
 // Componente de Input com Máscara Numérica
@@ -3169,6 +3170,118 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Laudos Transfer Curve Chart */}
+      {allLaudos.length > 0 && (
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-[450px] flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 rounded-lg border border-blue-100">
+                <FileText className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight">Curva de Transferência (Laudos)</h3>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-widest mt-0.5">
+                  Realizados vs Total por Período — Progresso Acumulado {laudosSummary.progresso}%
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-[9px] font-black uppercase tracking-widest">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-sm bg-blue-600" />
+                <span className="text-slate-400">Total</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+                <span className="text-slate-400">Realizados</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span className="text-slate-400">% Progresso</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 min-h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={allLaudos.map((l, idx) => {
+                  const itemsBefore = allLaudos.slice(0, idx + 1);
+                  const cumRealizados = itemsBefore.reduce((acc, x) => acc + parseNum(x.realizados), 0);
+                  const cumTotal = itemsBefore.reduce((acc, x) => acc + parseNum(x.total), 0);
+                  const progressPercent = cumTotal > 0 ? Number(((cumRealizados / cumTotal) * 100).toFixed(1)) : 0;
+                  return {
+                    periodo: l.periodo || `Período ${idx + 1}`,
+                    realizados: parseNum(l.realizados),
+                    total: parseNum(l.total),
+                    progressPercent
+                  };
+                })}
+                margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+              >
+                <defs>
+                  <linearGradient id="colorLaudoTotal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2563eb" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#2563eb" stopOpacity={0.4} />
+                  </linearGradient>
+                  <linearGradient id="colorLaudoRealizados" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.4} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="periodo"
+                  fontSize={10}
+                  fontWeight={700}
+                  stroke="#94a3b8"
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  yAxisId="left"
+                  fontSize={10}
+                  fontWeight={700}
+                  stroke="#94a3b8"
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  domain={[0, 100]}
+                  fontSize={10}
+                  fontWeight={700}
+                  stroke="#f59e0b"
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => `${v}%`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: 'none',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                  }}
+                  labelStyle={{ color: '#94a3b8', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}
+                  itemStyle={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700, padding: '2px 0' }}
+                  formatter={(value: any, name: any) => {
+                    const val = Number(value || 0);
+                    if (name === 'progressPercent') return [`${val}%`, '📈 Progresso Acum.'];
+                    if (name === 'realizados') return [val.toLocaleString('pt-BR'), '✅ Realizados'];
+                    if (name === 'total') return [val.toLocaleString('pt-BR'), '📊 Total'];
+                    return [val, name];
+                  }}
+                />
+                <Bar yAxisId="left" dataKey="total" fill="url(#colorLaudoTotal)" name="total" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                <Bar yAxisId="left" dataKey="realizados" fill="url(#colorLaudoRealizados)" name="realizados" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                <Line yAxisId="right" type="monotone" dataKey="progressPercent" name="progressPercent" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
       
       {/* Hover Comment Tooltip */}
       <AnimatePresence>
