@@ -88,8 +88,12 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
     estudosEnviados: migration.isIncremental
       ? Math.max(0, ...allDisks.map(d => parseNum(d.estudos)))
       : allDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0),
-    storageMapeado: allDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0),
-    storageEnviado: allDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0),
+    storageMapeado: migration.isIncremental
+      ? Math.max(0, ...allDisks.map(d => parseNum(d.storageMapeado)))
+      : allDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0),
+    storageEnviado: migration.isIncremental
+      ? Math.max(0, ...allDisks.map(d => parseNum(d.storageEnviado)))
+      : allDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0),
     totalLaudos: 0,
     laudosRealizados: 0,
     progresso: 0,
@@ -132,8 +136,12 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
     const estudosEnviados = isIncremental
       ? Math.max(0, ...groupDisks.map(d => parseNum(d.estudos)))
       : groupDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0);
-    const storageMapeado = groupDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0);
-    const storageEnviado = groupDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0);
+    const storageMapeado = isIncremental
+      ? Math.max(0, ...groupDisks.map(d => parseNum(d.storageMapeado)))
+      : groupDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0);
+    const storageEnviado = isIncremental
+      ? Math.max(0, ...groupDisks.map(d => parseNum(d.storageEnviado)))
+      : groupDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0);
     const progresso = totalPastas > 0 ? Number(((pastasRealizadas / totalPastas) * 100).toFixed(2)) : 0;
 
     const totalLaudos = groupLaudos.reduce((acc, l) => acc + parseNum(l.total), 0);
@@ -941,9 +949,12 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {group.disks.map((d: Disk, i: number) => {
+                        const isIncremental = migration.isIncremental;
                         const previousDisks = group.disks.slice(0, i);
                         const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
-                        const currentRunningEnviado = sumPrevEnviado + parseNum(d.storageEnviado);
+                        const currentRunningEnviado = isIncremental 
+                          ? parseNum(d.storageEnviado) 
+                          : (sumPrevEnviado + parseNum(d.storageEnviado));
 
                         return (
                           <tr key={i} className="hover:bg-slate-50/50 transition-colors group/row">
@@ -1005,11 +1016,11 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                                     readOnly={isGuest}
                                     className="w-20 bg-slate-50 text-center text-xs font-black outline-none rounded py-1 px-1.5"
                                     value={d.storageMapeado}
-                                    onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
+                                    onChange={v => updateDiskInGroup(group.id, i, isIncremental ? { storageMapeado: v } : { storageMapeado: v, storageEnviado: v })}
                                   />
                                   <span className="text-[8px] font-black text-slate-400">TB</span>
                                 </div>
-                                <span className="text-[7px] font-black text-slate-400 uppercase leading-none">Incremento</span>
+                                <span className="text-[7px] font-black text-slate-400 uppercase leading-none">{isIncremental ? 'Incremento' : 'Mapeado'}</span>
                               </div>
                             </td>
                             <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
@@ -1021,14 +1032,18 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                                     className="w-20 bg-emerald-50 text-center text-xs font-black outline-none rounded border border-emerald-100 py-1 px-1.5"
                                     value={currentRunningEnviado}
                                     onChange={v => {
-                                      const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
-                                      const delta = Math.max(0, v - sumPrevEnviado);
-                                      updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
+                                      if (isIncremental) {
+                                        updateDiskInGroup(group.id, i, { storageEnviado: v });
+                                      } else {
+                                        const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
+                                        const delta = Math.max(0, v - sumPrevEnviado);
+                                        updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
+                                      }
                                     }}
                                   />
                                   <span className="text-[8px] font-black text-emerald-600">TB</span>
                                 </div>
-                                <span className="text-[7px] font-black text-emerald-600 uppercase leading-none text-center">Total Unidade</span>
+                                <span className="text-[7px] font-black text-emerald-600 uppercase leading-none text-center">{isIncremental ? 'Snap Enviado' : 'Total Unidade'}</span>
                               </div>
                             </td>
                             <td className="p-4 text-right pr-6">
