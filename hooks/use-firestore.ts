@@ -117,6 +117,7 @@ export interface Migration {
   imageUrl?: string;
   disks?: Disk[];
   groups?: DiskGroup[];
+  isIncremental?: boolean;
   updatedAt: any;
 }
 

@@ -135,24 +135,24 @@ export default function Home() {
   );
 }
 
-function ReportsView({ 
-  migrations, 
-  onGenerateIncidencesReport, 
+function ReportsView({
+  migrations,
+  onGenerateIncidencesReport,
   onGenerateHandoffReport,
   onGenerateExecutiveReport,
   onGenerateInventoryReport,
   onGenerateLaudosReport,
   onGenerateStorageReport,
   onGenerateDensityReport
-}: { 
-  migrations: any[], 
+}: {
+  migrations: any[],
   onGenerateIncidencesReport: () => void,
   onGenerateHandoffReport: () => void,
   onGenerateExecutiveReport: () => void,
   onGenerateInventoryReport: () => void,
   onGenerateLaudosReport: () => void,
   onGenerateStorageReport: () => void,
-  onGenerateDensityReport: () => void 
+  onGenerateDensityReport: () => void
 }) {
   const reports = [
     {
@@ -218,7 +218,7 @@ function ReportsView({
         <div className="relative z-10 max-w-2xl">
           <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Centro de Inteligência e Exportação</h3>
           <p className="text-slate-400 text-sm font-medium leading-relaxed">
-            Selecione um dos modelos de relatório abaixo para extrair informações estruturadas da sua base de migração. 
+            Selecione um dos modelos de relatório abaixo para extrair informações estruturadas da sua base de migração.
             Todos os relatórios são gerados em tempo real com base nos dados mais recentes do MigraFlow.
           </p>
         </div>
@@ -235,15 +235,15 @@ function ReportsView({
                 {[1, 2, 3].map(dot => <div key={dot} className="w-1 h-1 rounded-full bg-slate-200" />)}
               </div>
             </div>
-            
+
             <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2 group-hover:text-blue-600 transition-colors">
               {report.title}
             </h4>
             <p className="text-xs text-slate-500 font-medium leading-relaxed mb-6 flex-1">
               {report.desc}
             </p>
-            
-            <button 
+
+            <button
               onClick={report.onClick}
               className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border border-slate-100 hover:border-slate-900 flex items-center justify-center gap-2 shadow-sm"
             >
@@ -270,7 +270,7 @@ function DashboardContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
-  
+
   // Safety Delete States
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
@@ -300,7 +300,7 @@ function DashboardContent() {
   // Safe Delete Handlers
   const triggerDelete = (type: 'client' | 'migration', id: string, label: string) => {
     const item = type === 'client' ? clients.find(c => c.id === id) : migrations.find(m => m.id === id);
-    
+
     // Integrity Check: Prevent deleting client with linked migrations
     if (type === 'client') {
       const hasLinkedMigrations = migrations.some(m => m.clientId === id);
@@ -315,19 +315,19 @@ function DashboardContent() {
 
   const executeConfirmDelete = async () => {
     if (!deleteConfirm.item) return;
-    
+
     const { type, id, label, item } = deleteConfirm;
-    
+
     try {
       if (type === 'client') {
         await deleteClient(id);
       } else {
         await deleteMigration(id);
       }
-      
+
       setDeleteConfirm({ ...deleteConfirm, isOpen: false });
       setUndoToast({ show: true, type, item, label });
-      
+
       // Auto-hide toast
       setTimeout(() => setUndoToast(prev => ({ ...prev, show: false })), 8000);
     } catch (error) {
@@ -337,7 +337,7 @@ function DashboardContent() {
 
   const handleUndo = async () => {
     if (!undoToast.item) return;
-    
+
     try {
       if (undoToast.type === 'client') {
         await addClient(undoToast.item);
@@ -359,10 +359,10 @@ function DashboardContent() {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(headers);
-    
+
     // Set column widths
     ws['!cols'] = [
-      { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, 
+      { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
       { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 20 }
     ];
 
@@ -420,7 +420,7 @@ function DashboardContent() {
         row.getCell(2).value = com.date;
         row.getCell(3).value = com.severity?.toUpperCase() || 'NORMAL';
         row.getCell(4).value = com.text;
-        
+
         row.eachCell((cell, i) => {
           cell.border = { bottom: { style: 'thin', color: { argb: 'FFFFE4E6' } } };
           cell.alignment = { vertical: 'middle', horizontal: i < 4 ? 'center' : 'left' };
@@ -483,13 +483,13 @@ function DashboardContent() {
     migrations.forEach(m => {
       const allLaudos = m.groups?.flatMap((g: any) => g.laudos || []) || [];
       const done = allLaudos.filter((l: any) => l.status === 'Concluído' || l.status === 'Realizado').length;
-      
+
       const row = sheet.getRow(currentRow);
       row.getCell(1).value = getClientName(m);
       row.getCell(2).value = allLaudos.length;
       row.getCell(3).value = done;
       row.getCell(4).value = allLaudos.length - done;
-      
+
       row.eachCell(cell => {
         cell.border = { bottom: { style: 'thin', color: { argb: 'FFFDE68A' } } };
         cell.alignment = { horizontal: 'center' };
@@ -497,7 +497,7 @@ function DashboardContent() {
       currentRow++;
     });
 
-    sheet.addImage(sheet.workbook.addImage({ base64: await generateChartImage('bar', [{label:'Total', value:10, color:'#b45309'}], 'Resumo Geral') || '', extension: 'png' }), { tl: { col: 5, row: 4 }, ext: { width: 300, height: 200 } });
+    sheet.addImage(sheet.workbook.addImage({ base64: await generateChartImage('bar', [{ label: 'Total', value: 10, color: '#b45309' }], 'Resumo Geral') || '', extension: 'png' }), { tl: { col: 5, row: 4 }, ext: { width: 300, height: 200 } });
 
     // --- SEPARAÇÃO POR CLIENTE ---
     for (const m of migrations) {
@@ -529,7 +529,7 @@ function DashboardContent() {
         r.getCell(5).value = Number(l.total) || 0;
         r.getCell(6).value = prog;
         r.getCell(6).numFmt = '0.0%';
-        
+
         r.eachCell(cell => { cell.border = { bottom: { style: 'thin', color: { argb: 'FFFDE68A' } } }; });
       });
 
@@ -598,7 +598,7 @@ function DashboardContent() {
       row.getCell(5).value = vol;
       row.getCell(5).numFmt = '#,##0.00 "TB"';
       row.getCell(6).value = 'AGUARDANDO ASSINATURA';
-      
+
       row.eachCell(cell => {
         cell.border = { bottom: { style: 'thin', color: { argb: 'FFE0E7FF' } } };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -635,9 +635,9 @@ function DashboardContent() {
     sheet.mergeCells('A1:F2');
     const titleCell = sheet.getCell('A1');
     titleCell.value = 'MIGRAFLOW | ANÁLISE DE DENSIDADE E EFICIÊNCIA OPERACIONAL';
-    titleCell.style = { 
-      font: { bold: true, size: 14, color: { argb: 'FF1E293B' } }, 
-      alignment: { horizontal: 'center', vertical: 'middle' } 
+    titleCell.style = {
+      font: { bold: true, size: 14, color: { argb: 'FF1E293B' } },
+      alignment: { horizontal: 'center', vertical: 'middle' }
     };
 
     // Table Headers
@@ -647,10 +647,10 @@ function DashboardContent() {
     headers.forEach((h, i) => {
       const cell = headerRow.getCell(i + 1);
       cell.value = h;
-      cell.style = { 
-        font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 }, 
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } }, 
-        alignment: { horizontal: 'center', vertical: 'middle' } 
+      cell.style = {
+        font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } },
+        alignment: { horizontal: 'center', vertical: 'middle' }
       };
     });
 
@@ -661,7 +661,7 @@ function DashboardContent() {
       const volTB = disks.reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0);
       const avgGB = studies > 0 ? (volTB * 1024) / studies : 0;
       const avgMB = avgGB * 1024;
-      
+
       let efficiency = "N/A";
       let effColor = "FF94A3B8";
       if (avgGB > 0) {
@@ -699,8 +699,8 @@ function DashboardContent() {
       const disks = getAllDisks(m);
       const studies = disks.reduce((sum: number, d: any) => sum + (Number(d.estudos) || 0), 0);
       const volTB = disks.reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0);
-      return { 
-        label: getClientName(m), 
+      return {
+        label: getClientName(m),
         value: studies > 0 ? (volTB * 1024) / studies : 0,
         color: '#6366f1'
       };
@@ -823,7 +823,7 @@ function DashboardContent() {
       data.forEach((d, i) => {
         if (d.value === 0 && total > 0) return;
         const sliceAngle = total > 0 ? (2 * Math.PI * d.value) / total : (2 * Math.PI) / (data.length || 1);
-        
+
         ctx.fillStyle = d.color;
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
@@ -838,7 +838,7 @@ function DashboardContent() {
         ctx.fillStyle = '#475569';
         ctx.font = '13px sans-serif';
         ctx.textAlign = 'left';
-        const percent = total > 0 ? ((d.value/total)*100).toFixed(1) : '0';
+        const percent = total > 0 ? ((d.value / total) * 100).toFixed(1) : '0';
         ctx.fillText(`${d.label}: ${d.value.toFixed(1)} (${percent}%)`, legendX + 25, legendY + 14);
 
         startAngle += sliceAngle;
@@ -904,17 +904,27 @@ function DashboardContent() {
       return m.disks || [];
     };
 
-    const totalMapeado = migrations.reduce((acc: number, m: any) => 
+    const totalMapeado = migrations.reduce((acc: number, m: any) =>
       acc + getAllDisks(m).reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0), 0);
-    
-    const totalEnviado = migrations.reduce((acc: number, m: any) => 
+
+    const totalEnviado = migrations.reduce((acc: number, m: any) =>
       acc + getAllDisks(m).reduce((sum: number, d: any) => sum + parseNum(d.storageEnviado), 0), 0);
-    
-    const totalPastas = migrations.reduce((acc: number, m: any) => 
-      acc + getAllDisks(m).reduce((sum: number, d: any) => sum + (Number(d.totalPastas) || 0), 0), 0);
-      
-    const realizedPastas = migrations.reduce((acc: number, m: any) => 
-      acc + getAllDisks(m).reduce((sum: number, d: any) => sum + (Number(d.pastasRealizadas) || 0), 0), 0);
+
+    const totalPastas = migrations.reduce((acc: number, m: any) => {
+      const allDisks = getAllDisks(m);
+      if (m.isIncremental) {
+        return acc + Math.max(0, ...allDisks.map((d: any) => Number(d.totalPastas) || 0));
+      }
+      return acc + allDisks.reduce((sum: number, d: any) => sum + (Number(d.totalPastas) || 0), 0);
+    }, 0);
+
+    const realizedPastas = migrations.reduce((acc: number, m: any) => {
+      const allDisks = getAllDisks(m);
+      if (m.isIncremental) {
+        return acc + Math.max(0, ...allDisks.map((d: any) => Number(d.pastasRealizadas) || 0));
+      }
+      return acc + allDisks.reduce((sum: number, d: any) => sum + (Number(d.pastasRealizadas) || 0), 0);
+    }, 0);
 
     const progressGlobal = totalPastas > 0 ? Math.min(1, realizedPastas / totalPastas) : 0;
 
@@ -922,7 +932,7 @@ function DashboardContent() {
       font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } },
       alignment: { horizontal: 'center', vertical: 'middle' },
-      border: { 
+      border: {
         bottom: { style: 'thin', color: { argb: 'FF334155' } },
         top: { style: 'thin', color: { argb: 'FF334155' } },
         left: { style: 'thin', color: { argb: 'FF334155' } },
@@ -957,9 +967,9 @@ function DashboardContent() {
       cellLabel.value = card.label;
       cellLabel.style = { font: { bold: true, size: 8, color: { argb: 'FF94A3B8' } }, alignment: { horizontal: 'center' }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } } };
       cellValue.value = card.value;
-      cellValue.style = { 
-        font: { bold: true, size: 12, color: { argb: card.color } }, 
-        alignment: { horizontal: 'center' }, 
+      cellValue.style = {
+        font: { bold: true, size: 12, color: { argb: card.color } },
+        alignment: { horizontal: 'center' },
         fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } },
         numFmt: card.format
       };
@@ -982,10 +992,16 @@ function DashboardContent() {
       const allDisks = getAllDisks(m);
       const mVol = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageMapeado), 0);
       const mSent = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageEnviado), 0);
-      const mTotal = allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0);
-      const mReal = allDisks.reduce((acc: number, d: any) => acc + (Number(d.pastasRealizadas) || 0), 0);
+      const mTotal = m.isIncremental
+        ? Math.max(0, ...allDisks.map((d: any) => Number(d.totalPastas) || 0))
+        : allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0);
+      const mReal = m.isIncremental
+        ? Math.max(0, ...allDisks.map((d: any) => Number(d.pastasRealizadas) || 0))
+        : allDisks.reduce((acc: number, d: any) => acc + (Number(d.pastasRealizadas) || 0), 0);
       const mProgress = mTotal > 0 ? Math.min(1, mReal / mTotal) : 0;
-      const mStudies = allDisks.reduce((acc: number, d: any) => acc + (Number(d.estudos) || 0), 0);
+      const mStudies = m.isIncremental
+        ? Math.max(0, ...allDisks.map((d: any) => Number(d.estudos) || 0))
+        : allDisks.reduce((acc: number, d: any) => acc + (Number(d.estudos) || 0), 0);
 
       const row = sheet.getRow(rowIndex);
       row.height = 20;
@@ -1036,8 +1052,8 @@ function DashboardContent() {
 
     const volumeByClient = migrations.slice(0, 8).map(m => {
       const allDisks = getAllDisks(m);
-      return { 
-        label: getClientName(m), 
+      return {
+        label: getClientName(m),
         value: allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageMapeado), 0),
         color: '#6366f1'
       };
@@ -1070,9 +1086,13 @@ function DashboardContent() {
       const allDisks = getAllDisks(m);
       const cTotal = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageMapeado), 0);
       const cSent = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageEnviado), 0);
-      const cProg = allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0) > 0 
-        ? Math.min(1, allDisks.reduce((acc: number, d: any) => acc + (Number(d.pastasRealizadas) || 0), 0) / allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0))
-        : 0;
+      const cTotalFolders = m.isIncremental
+        ? Math.max(0, ...allDisks.map((d: any) => Number(d.totalPastas) || 0))
+        : allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0);
+      const cRealizedFolders = m.isIncremental
+        ? Math.max(0, ...allDisks.map((d: any) => Number(d.pastasRealizadas) || 0))
+        : allDisks.reduce((acc: number, d: any) => acc + (Number(d.pastasRealizadas) || 0), 0);
+      const cProg = cTotalFolders > 0 ? Math.min(1, cRealizedFolders / cTotalFolders) : 0;
 
       const cCards = [
         { l: 'STATUS', v: m.status.toUpperCase(), c: 'FF1E293B' },
@@ -1137,23 +1157,23 @@ function DashboardContent() {
 
     // KPI Summary
     const totalDisks = migrations.reduce((acc: number, m: any) => acc + (m.disks?.length || 0) + (m.groups?.reduce((s: number, g: any) => s + (g.disks?.length || 0), 0) || 0), 0);
-    const totalMapeado = migrations.reduce((acc: number, m: any) => 
+    const totalMapeado = migrations.reduce((acc: number, m: any) =>
       acc + [...(m.disks || []), ...(m.groups?.flatMap((g: any) => g.disks || []) || [])]
-      .reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0), 0);
+        .reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0), 0);
 
     const fmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     sheet.mergeCells('A4:C5');
     sheet.getCell('A4').value = `Total de Discos: ${totalDisks} | Volumetria Global: ${fmt.format(totalMapeado)} TB`;
-    sheet.getCell('A4').style = { 
-      font: { bold: true, size: 10 }, 
-      alignment: { horizontal: 'center', vertical: 'middle' }, 
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }, 
-      border: { 
+    sheet.getCell('A4').style = {
+      font: { bold: true, size: 10 },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } },
+      border: {
         top: { style: 'thin', color: { argb: 'FFD1FAE5' } },
         bottom: { style: 'thin', color: { argb: 'FFD1FAE5' } },
         left: { style: 'thin', color: { argb: 'FFD1FAE5' } },
         right: { style: 'thin', color: { argb: 'FFD1FAE5' } }
-      } 
+      }
     };
 
     // Header Table
@@ -1180,7 +1200,7 @@ function DashboardContent() {
         const row = sheet.getRow(currentRow);
         row.height = 20;
         const progress = Number(d.totalPastas) > 0 ? Math.min(1, Number(d.pastasRealizadas) / Number(d.totalPastas)) : 0;
-        
+
         row.getCell(1).value = getClientName(m);
         row.getCell(2).value = m.groups?.find((g: any) => g.disks?.includes(d))?.title || 'Unidade Principal';
         row.getCell(3).value = d.path;
@@ -1269,7 +1289,7 @@ function DashboardContent() {
         r.getCell(6).numFmt = '#,##0.00';
         r.getCell(7).value = parseNum(d.storageEnviado);
         r.getCell(7).numFmt = '#,##0.00';
-        
+
         r.eachCell(cell => { cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } }; });
       });
 
@@ -1307,18 +1327,29 @@ function DashboardContent() {
 
   // Chart Data Preparation
   // Chart Data Preparation - Aggregated by Client
-  const aggregatedData = migrations.reduce((acc: any, m) => {
+  const aggregatedData = migrations.reduce((acc: any, m: any) => {
     const rawName = getClientName(m);
     const clientName = rawName ? rawName.trim() : "Cliente Indefinido";
 
     const allDisks = getAllDisks(m);
+    const isIncremental = m.isIncremental;
 
-    const studies = allDisks.reduce((sum: number, d: any) => sum + (Number(d.estudos) || 0), 0);
-    const folders = allDisks.reduce((sum: number, d: any) => {
-      const total = Number(d.totalPastas) || 0;
-      const realized = Number(d.pastasRealizadas) || 0;
-      return sum + (total > 0 ? total : realized);
-    }, 0);
+    const studies = isIncremental
+      ? Math.max(0, ...allDisks.map((d: any) => Number(d.estudos) || 0))
+      : allDisks.reduce((sum: number, d: any) => sum + (Number(d.estudos) || 0), 0);
+
+    const folders = isIncremental
+      ? Math.max(0, ...allDisks.map((d: any) => {
+        const total = Number(d.totalPastas) || 0;
+        const realized = Number(d.pastasRealizadas) || 0;
+        return total > 0 ? total : realized;
+      }))
+      : allDisks.reduce((sum: number, d: any) => {
+        const total = Number(d.totalPastas) || 0;
+        const realized = Number(d.pastasRealizadas) || 0;
+        return sum + (total > 0 ? total : realized);
+      }, 0);
+
     const volume = allDisks.reduce((sum: number, d: any) => sum + (Number(d.storageMapeado) || 0), 0);
 
     if (!acc[clientName]) {
@@ -1470,8 +1501,8 @@ function DashboardContent() {
               <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Operador</span>
             </div>
           </div>
-          <button 
-            onClick={() => signOut()} 
+          <button
+            onClick={() => signOut()}
             className="flex items-center gap-2 text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-lg transition-all active:scale-95"
           >
             <span className="text-[9px] font-black uppercase tracking-widest">Sair</span>
@@ -1484,7 +1515,7 @@ function DashboardContent() {
             <h2 className="text-sm md:text-xl font-black text-slate-900 uppercase tracking-tighter truncate">
               {selectedMigration ? `Detalhamento: ${getClientName(selectedMigration)}` : (
                 activeTab === 'overview' ? 'Painel de Monitoramento' :
-                  activeTab === 'clients' ? 'Gestão de Clientes' : 
+                  activeTab === 'clients' ? 'Gestão de Clientes' :
                     activeTab === 'reports' ? 'Centro de Inteligência' : 'Migrações'
               )}
             </h2>
@@ -1616,24 +1647,24 @@ function DashboardContent() {
                       </div>
 
                       {/* Mobile Chart: Horizontal Bars for better legibility */}
-                        <div className="md:hidden h-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart 
-                              layout="vertical" 
-                              data={chartData} 
-                              margin={{ top: 5, right: 20, left: 50, bottom: 5 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                              <XAxis type="number" hide />
-                              <YAxis 
-                                dataKey="name" 
-                                type="category" 
-                                fontSize={8} 
-                                stroke="#94a3b8" 
-                                width={90}
-                                tick={{ fontWeight: 'bold' }}
-                                interval={0}
-                              />
+                      <div className="md:hidden h-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            layout="vertical"
+                            data={chartData}
+                            margin={{ top: 5, right: 20, left: 50, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                            <XAxis type="number" hide />
+                            <YAxis
+                              dataKey="name"
+                              type="category"
+                              fontSize={8}
+                              stroke="#94a3b8"
+                              width={90}
+                              tick={{ fontWeight: 'bold' }}
+                              interval={0}
+                            />
                             <Tooltip
                               formatter={(value: any, name: any) => {
                                 const label = name === 'estudos' ? 'Estudos' : 'Pastas';
@@ -1758,7 +1789,7 @@ function DashboardContent() {
               </motion.div>
             )}
 
-            {activeTab === 'clients' && (
+            {!selectedMigration && activeTab === 'clients' && (
               <motion.div
                 key="clients"
                 initial={{ opacity: 0 }}
@@ -1847,11 +1878,11 @@ function DashboardContent() {
                                   <FileText className="w-4 h-4" />
                                   <span className="text-[10px] font-black uppercase tracking-widest">Ver Notas</span>
                                 </button>
-                                
+
                                 <div className="absolute left-0 top-full mt-2 w-[450px] bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-auto">
                                   <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observações Técnicas</span>
-                                    <button 
+                                    <button
                                       onClick={() => {
                                         const text = (client.description || '').replace(/<[^>]*>/g, '\n'); // Simple HTML to Text
                                         navigator.clipboard.writeText(text);
@@ -1862,7 +1893,7 @@ function DashboardContent() {
                                       <Copy className="w-3 h-3" /> COPIAR
                                     </button>
                                   </div>
-                                  <div 
+                                  <div
                                     className="text-[11px] text-slate-600 leading-relaxed max-h-[400px] overflow-y-auto custom-scrollbar prose prose-xs pr-2"
                                     dangerouslySetInnerHTML={{ __html: client.description || '' }}
                                   />
@@ -1908,7 +1939,7 @@ function DashboardContent() {
               </motion.div>
             )}
 
-            {activeTab === 'migrations' && (
+            {!selectedMigration && activeTab === 'migrations' && (
               <motion.div
                 key="migrations"
                 initial={{ opacity: 0 }}
@@ -1995,7 +2026,7 @@ function DashboardContent() {
                     <thead>
                       <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">
                         <th className="px-6 py-4 w-[25%]">
-                          <button 
+                          <button
                             onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
                             className="flex items-center gap-2 hover:text-white transition-colors w-full"
                           >
@@ -2043,9 +2074,9 @@ function DashboardContent() {
                               return (
                                 <div className="flex items-center gap-3 min-w-[120px]">
                                   <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-600'}`} 
-                                      style={{ width: `${progress}%` }} 
+                                    <div
+                                      className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-600'}`}
+                                      style={{ width: `${progress}%` }}
                                     />
                                   </div>
                                   <span className={`text-[10px] font-black ${progress === 100 ? 'text-emerald-600' : 'text-slate-900'}`}>{progress}%</span>
@@ -2101,16 +2132,16 @@ function DashboardContent() {
                 </div>
               </motion.div>
             )}
-            {activeTab === 'reports' && (
+            {!selectedMigration && activeTab === 'reports' && (
               <motion.div
                 key="reports"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
               >
-                <ReportsView 
-                  migrations={migrations} 
-                  onGenerateIncidencesReport={generateIncidencesReport} 
+                <ReportsView
+                  migrations={migrations}
+                  onGenerateIncidencesReport={generateIncidencesReport}
                   onGenerateHandoffReport={generateHandoffReport}
                   onGenerateExecutiveReport={generateExecutiveReport}
                   onGenerateInventoryReport={generateInventoryReport}
@@ -2194,7 +2225,7 @@ function DashboardContent() {
       {/* Global Undo Toast */}
       <AnimatePresence>
         {undoToast.show && (
-          <motion.div 
+          <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
@@ -2211,7 +2242,7 @@ function DashboardContent() {
                 <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">{undoToast.label}</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={handleUndo}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-blue-900/40"
             >
@@ -2250,13 +2281,13 @@ function DashboardContent() {
                 </p>
               </div>
               <div className="p-6 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-3">
-                <button 
+                <button
                   onClick={() => setDeleteConfirm({ ...deleteConfirm, isOpen: false })}
                   className="bg-white text-slate-600 px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs border border-slate-200 hover:bg-slate-100 transition-all active:scale-95"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={executeConfirmDelete}
                   className="bg-rose-600 text-white px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-all shadow-lg shadow-rose-900/20 active:scale-95"
                 >
@@ -2298,7 +2329,7 @@ function DashboardContent() {
                 </div>
               </div>
               <div className="p-6 bg-slate-50 border-t border-slate-100">
-                <button 
+                <button
                   onClick={() => setIntegrityModal({ ...integrityModal, isOpen: false })}
                   className="w-full bg-slate-900 text-white px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all active:scale-95 shadow-lg"
                 >
@@ -2547,6 +2578,7 @@ function MigrationModal({ isOpen, onClose, clients, onAdd, isGuest }: { isOpen: 
     endDate: format(new Date(), 'yyyy-MM-dd'),
     reportUrl: '',
     imageUrl: '',
+    isIncremental: false,
     groups: [{ id: 'default', title: 'Unidade Principal', disks: [] }] as DiskGroup[]
   });
 
@@ -2748,6 +2780,22 @@ function MigrationModal({ isOpen, onClose, clients, onAdd, isGuest }: { isOpen: 
               value={formData.description}
               onChange={e => setFormData({ ...formData, description: e.target.value })}
             />
+          </div>
+
+          <div className="col-span-2 bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">Cenário Incremental</p>
+              <p className="text-[9px] text-blue-700 font-bold leading-tight">Ative se os dados de pastas e estudos forem cumulativos/somados nos discos.</p>
+            </div>
+            <button
+              onClick={() => setFormData({ ...formData, isIncremental: !formData.isIncremental })}
+              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${formData.isIncremental
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                  : 'bg-white text-slate-400 border border-slate-200'
+                }`}
+            >
+              {formData.isIncremental ? 'Ativado' : 'Desativado'}
+            </button>
           </div>
 
           <div className="col-span-2 space-y-8">
@@ -3016,7 +3064,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
   const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
-  
+
   // Comment Modal State
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentModalTarget, setCommentModalTarget] = useState<{ groupId: string, diskIdx: number } | null>(null);
@@ -3042,13 +3090,19 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const allDisks = editedGroups.flatMap(g => g.disks);
 
   const summary = {
-    totalPastas: allDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0),
-    pastasRealizadas: allDisks.reduce((acc, d) => {
-      const total = parseNum(d.totalPastas);
-      const realized = parseNum(d.pastasRealizadas);
-      return acc + Math.min(realized, total);
-    }, 0),
-    estudosEnviados: allDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0),
+    totalPastas: migration.isIncremental
+      ? Math.max(0, ...allDisks.map(d => parseNum(d.totalPastas)))
+      : allDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0),
+    pastasRealizadas: migration.isIncremental
+      ? Math.max(0, ...allDisks.map(d => Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas))))
+      : allDisks.reduce((acc, d) => {
+        const total = parseNum(d.totalPastas);
+        const realized = parseNum(d.pastasRealizadas);
+        return acc + Math.min(realized, total);
+      }, 0),
+    estudosEnviados: migration.isIncremental
+      ? Math.max(0, ...allDisks.map(d => parseNum(d.estudos)))
+      : allDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0),
     storageMapeado: allDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0),
     storageEnviado: allDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0),
     progresso: 0
@@ -3067,17 +3121,24 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   laudosSummary.progresso = laudosSummary.total > 0 ? Math.min(100, Number(((laudosSummary.realizados / laudosSummary.total) * 100).toFixed(2))) : 0;
 
   const getGroupSummary = (groupDisks: Disk[]) => {
-    const totalPastas = groupDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0);
-    const pastasRealizadas = groupDisks.reduce((acc, d) => {
-      const total = parseNum(d.totalPastas);
-      const realized = parseNum(d.pastasRealizadas);
-      return acc + Math.min(realized, total);
-    }, 0);
-    const estudosEnviados = groupDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0);
+    const isIncremental = migration.isIncremental;
+    const totalPastas = isIncremental
+      ? Math.max(0, ...groupDisks.map(d => parseNum(d.totalPastas)))
+      : groupDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0);
+    const pastasRealizadas = isIncremental
+      ? Math.max(0, ...groupDisks.map(d => Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas))))
+      : groupDisks.reduce((acc, d) => {
+        const total = parseNum(d.totalPastas);
+        const realized = parseNum(d.pastasRealizadas);
+        return acc + Math.min(realized, total);
+      }, 0);
+    const estudosEnviados = isIncremental
+      ? Math.max(0, ...groupDisks.map(d => parseNum(d.estudos)))
+      : groupDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0);
     const storageMapeado = groupDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0);
     const storageEnviado = groupDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0);
     const progresso = totalPastas > 0 ? Number(((pastasRealizadas / totalPastas) * 100).toFixed(2)) : 0;
-    
+
     return { totalPastas, pastasRealizadas, estudosEnviados, storageMapeado, storageEnviado, progresso };
   };
 
@@ -3132,10 +3193,10 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const confirmRemoveItem = () => {
     if (!deleteTarget || isGuest) return;
     const { groupId, idx, type } = deleteTarget;
-    
+
     const group = editedGroups.find(g => g.id === groupId);
     if (!group) return;
-    
+
     if (type === 'disk') {
       const diskToDelete = group.disks[idx];
       setLastDeletedDisk({ groupId, disk: diskToDelete, idx });
@@ -3153,7 +3214,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
         laudos: (group.laudos || []).filter((_: Laudo, i: number) => i !== idx)
       } : g));
     }
-    
+
     setIsEditing(true);
     setIsDeleteConfirmOpen(false);
     setDeleteTarget(null);
@@ -3164,15 +3225,15 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const confirmBulkDelete = () => {
     if (!bulkDeleteTarget || isGuest) return;
     const { groupId } = bulkDeleteTarget;
-    
+
     const group = editedGroups.find(g => g.id === groupId);
     if (!group) return;
-    
+
     setLastBulkDelete({ groupId, data: { disks: group.disks || [], laudos: group.laudos || [] } });
     setUndoType('bulk');
-    
+
     setEditedGroups(editedGroups.map(g => g.id === groupId ? { ...g, disks: [], laudos: [] } : g));
-    
+
     setIsEditing(true);
     setIsDeleteConfirmOpen(false);
     setBulkDeleteTarget(null);
@@ -3182,7 +3243,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
   const undoDelete = () => {
     if (isGuest) return;
-    
+
     if (undoType === 'disk' && lastDeletedDisk) {
       const { groupId, disk, idx } = lastDeletedDisk;
       setEditedGroups(editedGroups.map(g => g.id === groupId ? {
@@ -3383,10 +3444,10 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
             if (currentMapeado < lastMapeado) lastMapeado = 0;
             if (currentEnviado < lastEnviado) lastEnviado = 0;
-            
+
             const individualMapeado = Math.max(0, currentMapeado - lastMapeado);
             const individualEnviado = Math.max(0, currentEnviado - lastMapeado);
-            
+
             lastMapeado = currentMapeado;
             lastEnviado = currentEnviado;
 
@@ -3430,18 +3491,18 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
     if (isGuest) {
       const today = new Date().toLocaleDateString();
       const quotaData = JSON.parse(localStorage.getItem('migraflow_ai_quota') || '{}');
-      
+
       if (quotaData.date !== today) {
         // New day, reset quota
         quotaData.date = today;
         quotaData.count = 0;
       }
-      
+
       if (quotaData.count >= 2) {
         alert("📊 Cota Diária Atingida: Visitantes podem gerar até 2 insights por dia. Entre em contato com o administrador para acesso completo.");
         return;
       }
-      
+
       // Increment and save
       quotaData.count += 1;
       localStorage.setItem('migraflow_ai_quota', JSON.stringify(quotaData));
@@ -3456,7 +3517,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
         }
         return ctx;
       }).join('\n');
-      
+
       const prompt = `Gere um resumo executivo técnico conciso e elegante para a migração do cliente ${migration.clientName}. 
       Contexto dos discos e observações técnicas:\n${diskContext}\n
       Destaque o progresso total (${summary.progresso}%), identifique gargalos potenciais (especialmente aqueles marcados com alta prioridade ou urgente) e forneça recomendações estratégicas baseadas nos comentários técnicos. 
@@ -3470,7 +3531,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      
+
       setAiInsight(data.text);
       setIsInsightModalOpen(true);
     } catch (error) {
@@ -3487,17 +3548,20 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
         <div className="bg-slate-900 px-6 py-4 border-b border-slate-800 flex justify-between items-center">
           <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Resumo Geral</h3>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => onUpdate({ isIncremental: !migration.isIncremental })}
+              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${migration.isIncremental
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}
+            >
+              {migration.isIncremental ? 'Cenário Incremental: ATIVO' : 'Cenário Incremental: INATIVO'}
+            </button>
             {isEditing && (
               <button onClick={handleSave} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all">Salvar</button>
             )}
             <button onClick={generateAISummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all">IA Insight</button>
           </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-6 divide-y divide-slate-100">
-          <div className="p-6 text-center"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pastas</span><div className="text-2xl font-black">{summary.pastasRealizadas.toLocaleString()}</div></div>
-          <div className="p-6 text-center"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Estudos</span><div className="text-2xl font-black">{summary.estudosEnviados.toLocaleString()}</div></div>
-          <div className="p-6 text-center"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Enviado (TB)</span><div className="text-2xl font-black">{summary.storageEnviado.toLocaleString()}</div></div>
-          <div className="p-6 text-center"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Progresso</span><div className="text-2xl font-black">{summary.progresso}%</div></div>
         </div>
       </div>
 
@@ -3506,43 +3570,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
           const groupSummary = getGroupSummary(group.disks);
           return (
             <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              {group.disks.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-6 divide-x divide-slate-50 bg-slate-50/50 border-b border-slate-100">
-                  <div className="p-3 flex flex-col items-center justify-center text-center">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Pastas</span>
-                    <span className="text-xs font-black text-slate-700 tracking-tighter">
-                      {groupSummary.pastasRealizadas.toLocaleString()} / {groupSummary.totalPastas.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="p-3 flex flex-col items-center justify-center text-center">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso</span>
-                    <span className={`text-xs font-black tracking-tighter ${groupSummary.progresso === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>
-                      {groupSummary.progresso}%
-                    </span>
-                  </div>
-                  <div className="p-3 flex flex-col items-center justify-center text-center">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudos</span>
-                    <span className="text-xs font-black text-slate-700 tracking-tighter">{groupSummary.estudosEnviados.toLocaleString()}</span>
-                  </div>
-                  <div className="p-3 flex flex-col items-center justify-center text-center">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mapeado</span>
-                    <span className="text-xs font-black text-slate-700 tracking-tighter">{groupSummary.storageMapeado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} TB</span>
-                  </div>
-                  <div className="p-3 flex flex-col items-center justify-center text-center">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Enviado</span>
-                    <span className="text-xs font-black text-blue-600 tracking-tighter">{groupSummary.storageEnviado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} TB</span>
-                  </div>
-                  <div className="p-3 flex flex-col items-center justify-center bg-slate-100/30">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Resumo Unidade</span>
-                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-500 ${groupSummary.progresso === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                        style={{ width: `${groupSummary.progresso}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Unit Summary Grid Removed per Request */}
 
               <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 w-full">
@@ -3566,7 +3594,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                     </button>
                   )}
                 </div>
-                
+
                 {!isGuest && (
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="whitespace-nowrap text-[9px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
@@ -3596,281 +3624,101 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                   </div>
                 )}
               </div>
+
               {group.disks.length > 0 && (
-                <>
-                  {/* Mobile Card Layout for Disks */}
-            <div className="grid grid-cols-1 gap-3 p-4 md:hidden bg-slate-50/30">
-              {group.disks.map((d: Disk, i: number) => {
-                const previousDisks = group.disks.slice(0, i);
-                const sumPrevMapeado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageMapeado), 0);
-                const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
-                const currentRunningMapeado = sumPrevMapeado + parseNum(d.storageMapeado);
-                const currentRunningEnviado = sumPrevEnviado + parseNum(d.storageEnviado);
-
-                return (
-                  <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <input
-                          type="text"
-                          className="w-full bg-transparent text-xs font-mono font-bold text-slate-800 outline-none focus:text-blue-600 border-b border-transparent focus:border-blue-200 pb-1"
-                          value={d.path}
-                          onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
-                        />
-                        {d.destination && (
-                          <div className="flex items-center gap-1.5 mt-2">
-                            <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded uppercase tracking-widest">Destino</span>
-                            <input
-                              type="text"
-                              className="flex-1 bg-transparent text-[10px] font-mono text-slate-500 outline-none truncate"
-                              value={d.destination}
-                              onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <select
-                        value={d.status}
-                        onChange={(e) => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
-                        className={`text-[9px] font-black uppercase tracking-widest rounded-lg px-2 py-1 outline-none border transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                          d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
-                            d.status === 'Pausado' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                              d.status === 'Reprocessamento de Erros' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                                'bg-slate-50 text-slate-400 border-slate-200'
-                          }`}
-                      >
-                        <option value="Pendente">Pendente</option>
-                        <option value="Realizando">Realizando</option>
-                        <option value="Pausado">Pausado</option>
-                        <option value="Realizado">Realizado</option>
-                        <option value="Reprocessamento de Erros">Reprocessamento de Erros</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-50">
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Realizadas</span>
-                        <NumericInput
-                          readOnly={isGuest}
-                          value={d.pastasRealizadas}
-                          onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })}
-                          className="w-full text-center text-xs font-black text-emerald-600 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-emerald-200"
-                        />
-                      </div>
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Estudos</span>
-                        <NumericInput
-                          readOnly={isGuest}
-                          value={d.estudos}
-                          onChange={v => updateDiskInGroup(group.id, i, { estudos: v })}
-                          className="w-full text-center text-xs font-black text-slate-900 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
-                        />
-                      </div>
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total</span>
-                        <NumericInput
-                          readOnly={isGuest}
-                          value={d.totalPastas}
-                          onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })}
-                          className="w-full text-center text-xs font-black text-slate-400 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div className="relative group/tooltip">
-                          {(!isGuest || d.comment) && (
-                            <button
-                              onMouseEnter={(e) => {
-                                if (d.comment) {
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  setHoveredComment({
-                                    text: d.comment.text,
-                                    severity: d.comment.severity,
-                                    x: rect.left,
-                                    y: rect.top
-                                  });
-                                }
-                              }}
-                              onMouseLeave={() => setHoveredComment(null)}
-                              onClick={() => {
-                                if (isGuest) return;
-                                setCommentModalTarget({ groupId: group.id, diskIdx: i });
-                                setCommentText(d.comment?.text || '');
-                                setCommentSeverity(d.comment?.severity || 'sem_prioridade');
-                                setIsCommentModalOpen(true);
-                              }}
-                              className={`p-2 rounded-xl transition-all ${d.comment
-                                ? getSeverityColor(d.comment.severity)
-                                : 'bg-slate-50 text-slate-300 hover:bg-slate-100'
-                                }`}
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                        {!isGuest && (
-                          <button
-                            onClick={() => removeDiskFromGroup(group.id, i)}
-                            className="p-2 bg-rose-50 text-rose-300 hover:text-rose-600 rounded-xl transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <div className="flex items-center gap-2">
-                          <div className="flex flex-col items-end">
-                            <div className="flex items-center gap-1">
-                              <NumericInput
-                                isFloat
-                                readOnly={isGuest}
-                                value={currentRunningEnviado}
-                                onChange={v => {
-                                  const delta = Math.max(0, v - sumPrevEnviado);
-                                  updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
-                                }}
-                                className="w-16 text-right text-[11px] font-black text-emerald-600 bg-slate-50 outline-none focus:ring-1 focus:ring-emerald-100 rounded px-1.5 py-0.5"
-                              />
-                              <span className="text-[8px] font-black text-emerald-500">TB</span>
-                            </div>
-                          </div>
-                          <span className="text-[9px] font-bold text-slate-300">/</span>
-                          <div className="flex flex-col items-end">
-                            <span className="text-[7px] font-black text-blue-500 uppercase mb-0.5">Incremento</span>
-                            <div className="flex items-center gap-1">
-                              <NumericInput
-                                isFloat
-                                readOnly={isGuest}
-                                value={d.storageMapeado}
-                                onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
-                                className="w-16 text-left text-[11px] font-black text-slate-400 bg-slate-50 outline-none focus:ring-1 focus:ring-slate-100 rounded px-1.5 py-0.5"
-                              />
-                              <span className="text-[8px] font-black text-slate-400">TB</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="hidden md:block overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[1000px]">
-                <thead>
-                  <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="p-4 pl-6 w-[25%]">Origem / Destino</th>
-                    <th className="p-4 text-center w-[12%]">Status</th>
-                    <th className="p-4 text-center w-[10%]">Realizadas</th>
-                    <th className="p-4 text-center w-[10%]">Estudos</th>
-                    <th className="p-4 text-center w-[10%]">Send</th>
-                    <th className="p-4 text-center w-[10%]">Total</th>
-                    <th className="p-4 text-center w-[8%]">Mapeado</th>
-                    <th className="p-4 text-center w-[8%]">Enviado</th>
-                    <th className="p-4 text-right pr-6 w-[7%]">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
+                <div className="grid grid-cols-1 gap-3 p-4 md:hidden bg-slate-50/30">
                   {group.disks.map((d: Disk, i: number) => {
                     const previousDisks = group.disks.slice(0, i);
-                    const sumPrevMapeado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageMapeado), 0);
                     const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
-                    const currentRunningMapeado = sumPrevMapeado + parseNum(d.storageMapeado);
                     const currentRunningEnviado = sumPrevEnviado + parseNum(d.storageEnviado);
 
                     return (
-                      <tr key={i} className="hover:bg-slate-50/50 transition-colors group/row">
-                        <td className="p-4 pl-6">
-                          <input
-                            type="text"
-                            className="w-full bg-transparent text-[11px] font-mono font-bold text-slate-700 outline-none focus:text-blue-600"
-                            value={d.path}
-                            onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
-                          />
-                          {d.destination && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1 rounded uppercase">Destino</span>
-                              <input
-                                type="text"
-                                className="flex-1 bg-transparent text-[10px] font-mono text-slate-400 outline-none"
-                                value={d.destination}
-                                onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
-                              />
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-4 text-center">
+                      <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="text"
+                              className="w-full bg-transparent text-xs font-mono font-bold text-slate-800 outline-none focus:text-blue-600 border-b border-transparent focus:border-blue-200 pb-1"
+                              value={d.path}
+                              onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
+                            />
+                            {d.destination && (
+                              <div className="flex items-center gap-1.5 mt-2">
+                                <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded uppercase tracking-widest">Destino</span>
+                                <input
+                                  type="text"
+                                  className="flex-1 bg-transparent text-[10px] font-mono text-slate-500 outline-none truncate"
+                                  value={d.destination}
+                                  onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
+                                />
+                              </div>
+                            )}
+                          </div>
                           <select
-                            disabled={isGuest}
-                            className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                              d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                d.status === 'Pausado' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                  d.status === 'Reprocessamento de Erros' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                                    'bg-slate-50 text-slate-400 border-slate-100'
-                              }`}
                             value={d.status}
-                            onChange={e => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
+                            onChange={(e) => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
+                            className={`text-[9px] font-black uppercase tracking-widest rounded-lg px-2 py-1 outline-none border transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                              d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
+                                d.status === 'Pausado' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                  d.status === 'Reprocessamento de Erros' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                                    'bg-slate-50 text-slate-400 border-slate-200'
+                              }`}
                           >
                             <option value="Pendente">Pendente</option>
-                            <option value="Realizando">Execução</option>
+                            <option value="Realizando">Realizando</option>
                             <option value="Pausado">Pausado</option>
-                            <option value="Realizado">Finalizado</option>
-                            <option value="Reprocessamento de Erros">Reprocessamento</option>
+                            <option value="Realizado">Realizado</option>
+                            <option value="Reprocessamento de Erros">Reprocessamento de Erros</option>
                           </select>
-                        </td>
-                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.pastasRealizadas} onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })} />
-                        </td>
-                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.estudos} onChange={v => updateDiskInGroup(group.id, i, { estudos: v })} />
-                        </td>
-                        <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.send} onChange={v => updateDiskInGroup(group.id, i, { send: v })} />
-                        </td>
-                        <td className="p-4 text-center text-xs font-mono font-black text-slate-400">
-                          <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.totalPastas} onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })} />
-                        </td>
-                        <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-400">
-                          <div className="flex flex-col items-center gap-0.5">
-                            <div className="flex items-center gap-1">
-                              <NumericInput
-                                isFloat
-                                readOnly={isGuest}
-                                className="w-20 bg-slate-50 text-center text-xs font-black outline-none rounded py-1 px-1.5"
-                                value={d.storageMapeado}
-                                onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
-                              />
-                              <span className="text-[8px] font-black text-slate-400">TB</span>
-                            </div>
-                            <span className="text-[7px] font-black text-slate-400 uppercase leading-none">Incremento</span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-50">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Realizadas</span>
+                            <NumericInput
+                              readOnly={isGuest}
+                              value={d.pastasRealizadas}
+                              onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })}
+                              className="w-full text-center text-xs font-black text-emerald-600 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-emerald-200"
+                            />
                           </div>
-                        </td>
-                        <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
-                          <div className="flex flex-col items-center gap-0.5">
-                            <div className="flex items-center gap-1">
-                              <NumericInput
-                                isFloat
-                                readOnly={isGuest}
-                                className="w-20 bg-emerald-50 text-center text-xs font-black outline-none rounded border border-emerald-100 py-1 px-1.5"
-                                value={currentRunningEnviado}
-                                onChange={v => {
-                                  const delta = Math.max(0, v - sumPrevEnviado);
-                                  updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
-                                }}
-                              />
-                              <span className="text-[8px] font-black text-emerald-600">TB</span>
-                            </div>
-                            <span className="text-[7px] font-black text-emerald-600 uppercase leading-none text-center">Total Unidade</span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Estudos</span>
+                            <NumericInput
+                              readOnly={isGuest}
+                              value={d.estudos}
+                              onChange={v => updateDiskInGroup(group.id, i, { estudos: v })}
+                              className="w-full text-center text-xs font-black text-slate-900 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
+                            />
                           </div>
-                        </td>
-                        <td className="p-4 text-right pr-6">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total</span>
+                            <NumericInput
+                              readOnly={isGuest}
+                              value={d.totalPastas}
+                              onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })}
+                              className="w-full text-center text-xs font-black text-slate-400 bg-slate-50 rounded p-1 outline-none focus:ring-1 focus:ring-slate-200"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
                             <div className="relative group/tooltip">
                               {(!isGuest || d.comment) && (
                                 <button
+                                  onMouseEnter={(e) => {
+                                    if (d.comment) {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setHoveredComment({
+                                        text: d.comment.text,
+                                        severity: d.comment.severity,
+                                        x: rect.left,
+                                        y: rect.top
+                                      });
+                                    }
+                                  }}
+                                  onMouseLeave={() => setHoveredComment(null)}
                                   onClick={() => {
                                     if (isGuest) return;
                                     setCommentModalTarget({ groupId: group.id, diskIdx: i });
@@ -3878,134 +3726,287 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                                     setCommentSeverity(d.comment?.severity || 'sem_prioridade');
                                     setIsCommentModalOpen(true);
                                   }}
-                                  className={`p-1.5 rounded-lg transition-all ${isGuest ? 'cursor-default' : 'cursor-pointer'} ${d.comment ? getSeverityColor(d.comment.severity) : 'text-slate-300 hover:text-blue-600 hover:bg-blue-50'}`}
-                                  title={isGuest ? "Observação Técnica" : "Comentário Técnico"}
+                                  className={`p-2 rounded-xl transition-all ${d.comment
+                                    ? getSeverityColor(d.comment.severity)
+                                    : 'bg-slate-50 text-slate-300 hover:bg-slate-100'
+                                    }`}
+                                >
+                                  <MessageSquare className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            {!isGuest && (
+                              <button
+                                onClick={() => removeDiskFromGroup(group.id, i)}
+                                className="p-2 bg-rose-50 text-rose-300 hover:text-rose-600 rounded-xl transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <div className="flex items-center gap-2">
+                              <div className="flex flex-col items-end">
+                                <div className="flex items-center gap-1">
+                                  <NumericInput
+                                    isFloat
+                                    readOnly={isGuest}
+                                    value={currentRunningEnviado}
+                                    onChange={v => {
+                                      const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
+                                      const delta = Math.max(0, v - sumPrevEnviado);
+                                      updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
+                                    }}
+                                    className="w-16 text-right text-[11px] font-black text-emerald-600 bg-slate-50 outline-none focus:ring-1 focus:ring-emerald-100 rounded px-1.5 py-0.5"
+                                  />
+                                  <span className="text-[8px] font-black text-emerald-500">TB</span>
+                                </div>
+                              </div>
+                              <span className="text-[9px] font-bold text-slate-300">/</span>
+                              <div className="flex flex-col items-end">
+                                <span className="text-[7px] font-black text-blue-500 uppercase mb-0.5">Incremento</span>
+                                <div className="flex items-center gap-1">
+                                  <NumericInput
+                                    isFloat
+                                    readOnly={isGuest}
+                                    value={d.storageMapeado}
+                                    onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
+                                    className="w-16 text-left text-[11px] font-black text-slate-400 bg-slate-50 outline-none focus:ring-1 focus:ring-slate-100 rounded px-1.5 py-0.5"
+                                  />
+                                  <span className="text-[8px] font-black text-slate-400">TB</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {group.disks.length > 0 && (
+                <div className="hidden md:block overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left border-collapse min-w-[1000px]">
+                    <thead>
+                      <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        <th className="p-4 pl-6 w-[25%]">Origem / Destino</th>
+                        <th className="p-4 text-center w-[12%]">Status</th>
+                        <th className="p-4 text-center w-[10%]">Realizadas</th>
+                        <th className="p-4 text-center w-[10%]">Estudos</th>
+                        <th className="p-4 text-center w-[10%]">Send</th>
+                        <th className="p-4 text-center w-[10%]">Total</th>
+                        <th className="p-4 text-center w-[8%]">Mapeado</th>
+                        <th className="p-4 text-center w-[8%]">Enviado</th>
+                        <th className="p-4 text-right pr-6 w-[7%]">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {group.disks.map((d: Disk, i: number) => {
+                        const previousDisks = group.disks.slice(0, i);
+                        const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
+                        const currentRunningEnviado = sumPrevEnviado + parseNum(d.storageEnviado);
+
+                        return (
+                          <tr key={i} className="hover:bg-slate-50/50 transition-colors group/row">
+                            <td className="p-4 pl-6">
+                              <input
+                                type="text"
+                                className="w-full bg-transparent text-[11px] font-mono font-bold text-slate-700 outline-none focus:text-blue-600"
+                                value={d.path}
+                                onChange={e => updateDiskInGroup(group.id, i, { path: e.target.value })}
+                              />
+                              {d.destination && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-1 rounded uppercase">Destino</span>
+                                  <input
+                                    type="text"
+                                    className="flex-1 bg-transparent text-[10px] font-mono text-slate-400 outline-none"
+                                    value={d.destination}
+                                    onChange={e => updateDiskInGroup(group.id, i, { destination: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-4 text-center">
+                              <select
+                                disabled={isGuest}
+                                className={`text-[9px] font-black uppercase py-1 px-2 rounded-lg border outline-none cursor-pointer transition-all ${d.status === 'Realizado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                  d.status === 'Realizando' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                    d.status === 'Pausado' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                      d.status === 'Reprocessamento de Erros' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                                        'bg-slate-50 text-slate-400 border-slate-100'
+                                  }`}
+                                value={d.status}
+                                onChange={e => updateDiskInGroup(group.id, i, { status: e.target.value as any })}
+                              >
+                                <option value="Pendente">Pendente</option>
+                                <option value="Realizando">Execução</option>
+                                <option value="Pausado">Pausado</option>
+                                <option value="Realizado">Finalizado</option>
+                                <option value="Reprocessamento de Erros">Reprocessamento</option>
+                              </select>
+                            </td>
+                            <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                              <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.pastasRealizadas} onChange={v => updateDiskInGroup(group.id, i, { pastasRealizadas: v })} />
+                            </td>
+                            <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                              <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.estudos} onChange={v => updateDiskInGroup(group.id, i, { estudos: v })} />
+                            </td>
+                            <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                              <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.send} onChange={v => updateDiskInGroup(group.id, i, { send: v })} />
+                            </td>
+                            <td className="p-4 text-center text-xs font-mono font-black text-slate-400">
+                              <NumericInput readOnly={isGuest} className="w-full bg-transparent text-center outline-none" value={d.totalPastas} onChange={v => updateDiskInGroup(group.id, i, { totalPastas: v })} />
+                            </td>
+                            <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-400">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <div className="flex items-center gap-1">
+                                  <NumericInput
+                                    isFloat
+                                    readOnly={isGuest}
+                                    className="w-20 bg-slate-50 text-center text-xs font-black outline-none rounded py-1 px-1.5"
+                                    value={d.storageMapeado}
+                                    onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
+                                  />
+                                  <span className="text-[8px] font-black text-slate-400">TB</span>
+                                </div>
+                                <span className="text-[7px] font-black text-slate-400 uppercase leading-none">Incremento</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-center text-[10px] font-mono font-bold text-slate-900">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <div className="flex items-center gap-1">
+                                  <NumericInput
+                                    isFloat
+                                    readOnly={isGuest}
+                                    className="w-20 bg-emerald-50 text-center text-xs font-black outline-none rounded border border-emerald-100 py-1 px-1.5"
+                                    value={currentRunningEnviado}
+                                    onChange={v => {
+                                      const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
+                                      const delta = Math.max(0, v - sumPrevEnviado);
+                                      updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
+                                    }}
+                                  />
+                                  <span className="text-[8px] font-black text-emerald-600">TB</span>
+                                </div>
+                                <span className="text-[7px] font-black text-emerald-600 uppercase leading-none text-center">Total Unidade</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right pr-6">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setCommentModalTarget({ groupId: group.id, diskIdx: i });
+                                    setCommentText(d.comment?.text || '');
+                                    setCommentSeverity(d.comment?.severity || 'sem_prioridade');
+                                    setIsCommentModalOpen(true);
+                                  }}
+                                  className={`p-1.5 rounded-lg transition-all ${d.comment ? getSeverityColor(d.comment.severity) : 'text-slate-300 hover:text-blue-600 hover:bg-blue-50'}`}
                                 >
                                   <MessageSquare className="w-3.5 h-3.5" />
                                 </button>
-                              )}
-                            {d.comment?.text && (
-                              <div className="absolute bottom-full right-0 mb-3 w-72 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none translate-y-2 group-hover/tooltip:translate-y-0">
-                                <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
-                                  <div className={`w-2 h-2 rounded-full ${
-                                    d.comment.severity === 'sem_prioridade' ? 'bg-slate-400' :
-                                    d.comment.severity === 'baixa' ? 'bg-blue-500' :
-                                    d.comment.severity === 'media' ? 'bg-amber-500' :
-                                    d.comment.severity === 'alta' ? 'bg-orange-500' : 'bg-rose-500'
-                                  }`} />
-                                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                                    {d.comment.severity.replace('_', ' ')}
-                                  </span>
-                                </div>
-                                <p className="text-[11px] leading-relaxed font-medium text-slate-200 whitespace-pre-wrap">{d.comment.text}</p>
-                                <div className="absolute top-full right-4 w-3 h-3 bg-slate-900 rotate-45 -mt-1.5" />
+                                <button
+                                  onClick={() => removeDiskFromGroup(group.id, i)}
+                                  className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/row:opacity-100"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
-                            )}
-                          </div>
-                          {!isGuest && (
-                            <button
-                              onClick={() => removeDiskFromGroup(group.id, i)}
-                              className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/row:opacity-100"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      </tr>
-                    );
-                  })}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
-                </>
               )}
 
-                {/* Laudos Table Section */}
-                {((group.laudos && group.laudos.length > 0) || group.disks.length === 0) && (
-                  <div className={`mt-0 pt-0 ${group.disks.length > 0 ? 'mt-8 pt-8 border-t border-slate-100' : ''}`}>
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 px-6 pt-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
-                          <FileText className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Relatórios Clínicos / Laudos</h4>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Acompanhamento por Período</p>
-                        </div>
+              {/* Laudos Table Section */}
+              {((group.laudos && group.laudos.length > 0) || group.disks.length === 0) && (
+                <div className={`mt-0 pt-0 ${group.disks.length > 0 ? 'mt-8 pt-8 border-t border-slate-100' : ''}`}>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 px-6 pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
+                        <FileText className="w-5 h-5 text-blue-600" />
                       </div>
-                      <div className="flex flex-col md:flex-row items-start md:items-center gap-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
-                        <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Status Global da Unidade</span>
-                          <div className="flex items-center gap-3">
-                            <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%` }}
-                                className="h-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]"
-                              />
-                            </div>
-                            <span className="text-xs font-black text-blue-600">
-                              {(( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%
-                            </span>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Relatórios Clínicos / Laudos</h4>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Acompanhamento por Período</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Status Global da Unidade</span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${(((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%` }}
+                              className="h-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]"
+                            />
                           </div>
-                        </div>
-                        <div className="flex gap-4 border-l border-slate-200 pl-6">
-                          {!isGuest && (
-                            <button
-                              onClick={() => addLaudoToGroup(group.id)}
-                              className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95"
-                            >
-                              <Plus className="w-3.5 h-3.5" /> Adicionar Período
-                            </button>
-                          )}
-                          {!isGuest && group.laudos && group.laudos.length > 0 && (
-                            <button
-                              onClick={() => clearAllData(group.id)}
-                              className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline px-2"
-                            >
-                              Limpar Tudo
-                            </button>
-                          )}
+                          <span className="text-xs font-black text-blue-600">
+                            {(((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%
+                          </span>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Clinical Summary Cards for this Unit */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6 px-6">
-                      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total de Laudos</p>
-                        <p className="text-xl font-black text-slate-900 font-mono">
-                          {(group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm border-l-4 border-l-blue-600">
-                        <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">Realizados</p>
-                        <p className="text-xl font-black text-slate-900 font-mono">
-                          {(group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm border-l-4 border-l-amber-500">
-                        <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">Pendente</p>
-                        <p className="text-xl font-black text-slate-900 font-mono">
-                          {((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) - (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0)).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <div className="bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-900/20">
-                        <p className="text-[9px] font-black text-blue-100 uppercase tracking-widest mb-1">Progresso Final</p>
-                        <p className="text-xl font-black text-white font-mono">
-                          {(( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%
-                        </p>
+                      <div className="flex gap-4 border-l border-slate-200 pl-6">
+                        {!isGuest && (
+                          <button
+                            onClick={() => addLaudoToGroup(group.id)}
+                            className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Adicionar Período
+                          </button>
+                        )}
+                        {!isGuest && group.laudos && group.laudos.length > 0 && (
+                          <button
+                            onClick={() => clearAllData(group.id)}
+                            className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline px-2"
+                          >
+                            Limpar Tudo
+                          </button>
+                        )}
                       </div>
                     </div>
+                  </div>
 
-                    <div className="mx-6 mb-8 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="bg-slate-50/50 px-6 py-3 border-b border-slate-100 flex items-center justify-between">
-                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-blue-500" />
-                          Listagem Detalhada por Período
-                        </h4>
-                      </div>
+                  {/* Clinical Summary Cards for this Unit */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6 px-6">
+                    <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total de Laudos</p>
+                      <p className="text-xl font-black text-slate-900 font-mono">
+                        {(group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm border-l-4 border-l-blue-600">
+                      <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">Realizados</p>
+                      <p className="text-xl font-black text-slate-900 font-mono">
+                        {(group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm border-l-4 border-l-amber-500">
+                      <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">Pendente</p>
+                      <p className="text-xl font-black text-slate-900 font-mono">
+                        {((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) - (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0)).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-900/20">
+                      <p className="text-[9px] font-black text-blue-100 uppercase tracking-widest mb-1">Progresso Final</p>
+                      <p className="text-xl font-black text-white font-mono">
+                        {(((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mx-6 mb-8 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-slate-50/50 px-6 py-3 border-b border-slate-100 flex items-center justify-between">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-blue-500" />
+                        Listagem Detalhada por Período
+                      </h4>
+                    </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
                         <thead>
@@ -4017,10 +4018,10 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                          { (group.laudos || []).map((laudo: Laudo, li: number) => (
+                          {(group.laudos || []).map((laudo: Laudo, li: number) => (
                             <tr key={laudo.id || li} className="hover:bg-slate-50/50 transition-colors group/laudo">
                               <td className="p-4 pl-12 text-xs font-bold text-slate-700">
-                                <input 
+                                <input
                                   type="text"
                                   className="w-full bg-transparent outline-none focus:text-blue-600 border-b border-transparent focus:border-blue-200"
                                   value={laudo.periodo}
@@ -4030,10 +4031,9 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                                 />
                               </td>
                               <td className="p-4 text-center">
-                                <select 
-                                  className={`inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest outline-none border appearance-none text-center ${
-                                    laudo.status === 'Realizado' ? 'bg-[#e7f9ee] text-[#10b981] border-[#dcfce7]' : 'bg-[#fff7ed] text-[#f59e0b] border-[#ffedd5]'
-                                  }`}
+                                <select
+                                  className={`inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest outline-none border appearance-none text-center ${laudo.status === 'Realizado' ? 'bg-[#e7f9ee] text-[#10b981] border-[#dcfce7]' : 'bg-[#fff7ed] text-[#f59e0b] border-[#ffedd5]'
+                                    }`}
                                   value={laudo.status}
                                   onChange={e => updateLaudoInGroup(group.id, laudo.id!, { status: e.target.value as any })}
                                   disabled={isGuest}
@@ -4044,7 +4044,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                                 </select>
                               </td>
                               <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
-                                <NumericInput 
+                                <NumericInput
                                   className="w-full bg-transparent text-center outline-none"
                                   value={laudo.realizados}
                                   onChange={v => updateLaudoInGroup(group.id, laudo.id!, { realizados: v })}
@@ -4053,14 +4053,14 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                               </td>
                               <td className="p-4 text-center text-xs font-mono font-black text-slate-900 pr-12 relative">
                                 <div className="flex items-center justify-center gap-2">
-                                  <NumericInput 
+                                  <NumericInput
                                     className="w-full bg-transparent text-center outline-none"
                                     value={laudo.total}
                                     onChange={v => updateLaudoInGroup(group.id, laudo.id!, { total: v })}
                                     readOnly={isGuest}
                                   />
                                   {!isGuest && (
-                                    <button 
+                                    <button
                                       onClick={() => askRemoveLaudo(group.id, li)}
                                       className="absolute right-4 p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/laudo:opacity-100"
                                     >
@@ -4068,30 +4068,30 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                                     </button>
                                   )}
                                 </div>
-                                </td>
-                              </tr>
+                              </td>
+                            </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
-                  </div>
-                )}
+                </div>
+              )}
 
-                {/* If unit has disks but NO laudos yet, show a subtle button to add reports module */}
-                {!isGuest && group.disks.length > 0 && (!group.laudos || group.laudos.length === 0) && (
-                  <div className="p-8 flex justify-center border-t border-slate-50 bg-slate-50/30">
-                    <button
-                      onClick={() => addLaudoToGroup(group.id)}
-                      className="flex items-center gap-3 text-slate-400 hover:text-blue-600 transition-all group"
-                    >
-                      <div className="p-2 rounded-xl bg-white border border-slate-200 group-hover:border-blue-200 group-hover:shadow-md transition-all">
-                        <FilePlus className="w-5 h-5" />
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Habilitar Módulo de Laudos Clínicos</span>
-                    </button>
-                  </div>
-                )}
+              {/* If unit has disks but NO laudos yet, show a subtle button to add reports module */}
+              {!isGuest && group.disks.length > 0 && (!group.laudos || group.laudos.length === 0) && (
+                <div className="p-8 flex justify-center border-t border-slate-50 bg-slate-50/30">
+                  <button
+                    onClick={() => addLaudoToGroup(group.id)}
+                    className="flex items-center gap-3 text-slate-400 hover:text-blue-600 transition-all group"
+                  >
+                    <div className="p-2 rounded-xl bg-white border border-slate-200 group-hover:border-blue-200 group-hover:shadow-md transition-all">
+                      <FilePlus className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Habilitar Módulo de Laudos Clínicos</span>
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -4169,10 +4169,10 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
           <div className="flex-1 min-h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                data={allLaudos.map((l, idx) => {
+                data={allLaudos.map((l: any, idx: number) => {
                   const itemsBefore = allLaudos.slice(0, idx + 1);
-                  const cumRealizados = itemsBefore.reduce((acc, x) => acc + parseNum(x.realizados), 0);
-                  const cumTotal = itemsBefore.reduce((acc, x) => acc + parseNum(x.total), 0);
+                  const cumRealizados = itemsBefore.reduce((acc: number, x: any) => acc + parseNum(x.realizados), 0);
+                  const cumTotal = itemsBefore.reduce((acc: number, x: any) => acc + parseNum(x.total), 0);
                   const progressPercent = cumTotal > 0 ? Math.min(100, Number(((cumRealizados / cumTotal) * 100).toFixed(1))) : 0;
                   return {
                     periodo: l.periodo || `Período ${idx + 1}`,
@@ -4247,7 +4247,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
           </div>
         </div>
       )}
-      
+
       {/* Hover Comment Tooltip */}
       <AnimatePresence>
         {hoveredComment && (
@@ -4255,21 +4255,20 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            style={{ 
-              position: 'fixed', 
-              left: hoveredComment?.x || 0, 
+            style={{
+              position: 'fixed',
+              left: hoveredComment?.x || 0,
               top: (hoveredComment?.y || 0) - 120, // Position above
-              zIndex: 9999 
+              zIndex: 9999
             }}
             className="hidden md:block w-72 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl pointer-events-none"
           >
             <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
-              <div className={`w-2 h-2 rounded-full ${
-                hoveredComment?.severity === 'sem_prioridade' ? 'bg-slate-400' :
-                hoveredComment?.severity === 'baixa' ? 'bg-blue-500' :
-                hoveredComment?.severity === 'media' ? 'bg-amber-500' :
-                hoveredComment?.severity === 'alta' ? 'bg-orange-500' : 'bg-rose-500'
-              }`} />
+              <div className={`w-2 h-2 rounded-full ${hoveredComment?.severity === 'sem_prioridade' ? 'bg-slate-400' :
+                  hoveredComment?.severity === 'baixa' ? 'bg-blue-500' :
+                    hoveredComment?.severity === 'media' ? 'bg-amber-500' :
+                      hoveredComment?.severity === 'alta' ? 'bg-orange-500' : 'bg-rose-500'
+                }`} />
               <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
                 {hoveredComment?.severity.replace('_', ' ')}
               </span>
@@ -4307,24 +4306,24 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Relatório Estratégico</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsInsightModalOpen(false)}
                   className="p-2 hover:bg-slate-800 rounded-xl transition-all text-slate-400 hover:text-white"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              
+
               <div className="p-5 md:p-8 overflow-y-auto flex-1 custom-scrollbar">
                 <div className="prose prose-slate max-w-none">
                   <div className="space-y-4">
                     {(aiInsight || "").split('\n').map((line: string, li: number) => {
                       let currentLine = line.trim();
                       if (!currentLine) return <div key={li} className="h-2" />;
-                      
+
                       const isBullet = currentLine.startsWith('- ') || currentLine.startsWith('* ');
                       if (isBullet) currentLine = currentLine.slice(2);
-                      
+
                       const isHeader = currentLine.startsWith('#');
                       if (isHeader) currentLine = currentLine.replace(/^#+\s+/, '');
 
@@ -4356,15 +4355,14 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                   </div>
                 </div>
               </div>
-              
+
               <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button 
+                <button
                   onClick={copyInsight}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border ${
-                    copiedInsight 
-                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border ${copiedInsight
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   {copiedInsight ? (
                     <>
@@ -4376,7 +4374,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                     </>
                   )}
                 </button>
-                <button 
+                <button
                   onClick={() => setIsInsightModalOpen(false)}
                   className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-lg active:scale-95"
                 >
@@ -4415,7 +4413,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Observação de Engenharia</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsCommentModalOpen(false)}
                   className="p-2 hover:bg-slate-800 rounded-xl transition-all text-slate-500 hover:text-white"
                 >
@@ -4437,11 +4435,10 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                       <button
                         key={opt.id}
                         onClick={() => setCommentSeverity(opt.id as any)}
-                        className={`flex items-center gap-3 w-full p-3 rounded-2xl border-2 transition-all ${
-                          commentSeverity === opt.id 
-                            ? 'border-blue-600 bg-blue-50/50' 
+                        className={`flex items-center gap-3 w-full p-3 rounded-2xl border-2 transition-all ${commentSeverity === opt.id
+                            ? 'border-blue-600 bg-blue-50/50'
                             : 'border-slate-100 hover:border-slate-200 bg-white'
-                        }`}
+                          }`}
                       >
                         <div className={`w-3 h-3 rounded-full ${opt.color}`} />
                         <span className={`text-xs font-bold ${commentSeverity === opt.id ? 'text-blue-700' : 'text-slate-600'}`}>{opt.label}</span>
@@ -4462,13 +4459,13 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
               </div>
 
               <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-                <button 
+                <button
                   onClick={() => setIsCommentModalOpen(false)}
                   className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-100 transition-all"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={saveComment}
                   className="flex-1 bg-blue-600 text-white py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-all shadow-lg active:scale-95"
                 >
@@ -4483,7 +4480,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       {/* Undo Toast */}
       <AnimatePresence>
         {showUndoToast && (
-          <motion.div 
+          <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
@@ -4498,16 +4495,16 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                   {undoType === 'bulk' ? 'Dados Removidos' : undoType === 'disk' ? 'Disco Excluído' : 'Laudo Excluído'}
                 </p>
                 <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">
-                  {undoType === 'bulk' 
+                  {undoType === 'bulk'
                     ? 'Todos os dados da unidade foram limpos'
-                    : undoType === 'disk' 
+                    : undoType === 'disk'
                       ? (lastDeletedDisk?.disk.path || 'Sem caminho')
                       : (lastDeletedLaudo?.laudo.periodo || 'Sem período')
                   }
                 </p>
               </div>
             </div>
-            <button 
+            <button
               onClick={undoDelete}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-blue-900/40"
             >
@@ -4543,13 +4540,13 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                   <AlertCircle className="w-8 h-8 text-rose-600" />
                 </div>
                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">
-                  {bulkDeleteTarget 
-                    ? 'Limpar Toda Unidade?' 
+                  {bulkDeleteTarget
+                    ? 'Limpar Toda Unidade?'
                     : deleteTarget?.type === 'disk' ? 'Excluir Disco?' : 'Excluir Laudo?'
                   }
                 </h2>
                 <p className="text-sm text-slate-500 leading-relaxed font-medium">
-                  {bulkDeleteTarget 
+                  {bulkDeleteTarget
                     ? 'Tem certeza que deseja remover TODOS os dados desta unidade? Esta ação pode ser desfeita.'
                     : deleteTarget?.type === 'disk'
                       ? "Esta ação removerá o disco e todas as métricas associadas. Deseja continuar?"
@@ -4558,7 +4555,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                 </p>
               </div>
               <div className="p-6 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-3">
-                <button 
+                <button
                   onClick={() => {
                     setIsDeleteConfirmOpen(false);
                     setDeleteTarget(null);
@@ -4568,7 +4565,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={bulkDeleteTarget ? confirmBulkDelete : confirmRemoveItem}
                   className="bg-rose-600 text-white px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-all shadow-lg shadow-rose-900/20 active:scale-95"
                 >
