@@ -96,7 +96,8 @@ export default function Overview({
                     formatter={(value: any, name: any) => {
                       const label = name === 'volume' ? 'Volume' :
                         name === 'estudos' ? 'Estudos' :
-                          name === 'pastas' ? 'Pastas' : name;
+                        name === 'pastas' ? 'Pastas' : 
+                        name === 'laudos' ? 'Laudos' : name;
                       const unit = name === 'volume' ? ' TB' : '';
                       return [`${value?.toLocaleString() || '0'}${unit}`, label];
                     }}
@@ -105,6 +106,9 @@ export default function Overview({
                   />
                   <Bar dataKey="estudos" fill="#2563eb" radius={[4, 4, 0, 0]} name="Estudos">
                     <LabelList dataKey="estudos" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#1e293b' }} />
+                  </Bar>
+                  <Bar dataKey="laudos" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Laudos">
+                    <LabelList dataKey="laudos" position="top" formatter={(v: any) => v > 0 ? v.toLocaleString() : ''} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#b45309' }} />
                   </Bar>
                   <Bar dataKey="pastas" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Pastas">
                     <LabelList dataKey="pastas" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#64748b' }} />
@@ -134,13 +138,14 @@ export default function Overview({
                   />
                   <Tooltip
                     formatter={(value: any, name: any) => {
-                      const label = name === 'estudos' ? 'Estudos' : 'Pastas';
+                      const label = name === 'estudos' ? 'Estudos' : name === 'laudos' ? 'Laudos' : 'Pastas';
                       return [`${value?.toLocaleString() || '0'}`, label];
                     }}
                     contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', color: '#fff' }}
                     itemStyle={{ fontSize: '10px' }}
                   />
                   <Bar dataKey="estudos" fill="#2563eb" radius={[0, 4, 4, 0]} name="Estudos" />
+                  <Bar dataKey="laudos" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Laudos" />
                   <Bar dataKey="pastas" fill="#94a3b8" radius={[0, 4, 4, 0]} name="Pastas" />
                 </BarChart>
               </ResponsiveContainer>

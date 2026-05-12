@@ -90,23 +90,35 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
       : allDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0),
     storageMapeado: allDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0),
     storageEnviado: allDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0),
-    progresso: 0
+    totalLaudos: 0,
+    laudosRealizados: 0,
+    progresso: 0,
+    progressoLaudos: 0
   };
+
+  const allLaudos = editedGroups.flatMap(g => g.laudos || []);
+  summary.totalLaudos = allLaudos.reduce((acc, l) => acc + parseNum(l.total), 0);
+  summary.laudosRealizados = allLaudos.reduce((acc, l) => acc + parseNum(l.realizados), 0);
 
   const total = summary.totalPastas;
   const realized = summary.pastasRealizadas;
   summary.progresso = total > 0 ? Math.min(100, Number(((realized / total) * 100).toFixed(2))) : 0;
+  
+  const totalL = summary.totalLaudos;
+  const realizedL = summary.laudosRealizados;
+  summary.progressoLaudos = totalL > 0 ? Math.min(100, Number(((realizedL / totalL) * 100).toFixed(2))) : 0;
 
-  const allLaudos = editedGroups.flatMap(g => g.laudos || []);
   const laudosSummary = {
-    total: allLaudos.reduce((acc, l) => acc + parseNum(l.total), 0),
-    realizados: allLaudos.reduce((acc, l) => acc + parseNum(l.realizados), 0),
-    progresso: 0
+    total: summary.totalLaudos,
+    realizados: summary.laudosRealizados,
+    progresso: summary.progressoLaudos
   };
-  laudosSummary.progresso = laudosSummary.total > 0 ? Math.min(100, Number(((laudosSummary.realizados / laudosSummary.total) * 100).toFixed(2))) : 0;
 
-  const getGroupSummary = (groupDisks: Disk[]) => {
+  const getGroupSummary = (group: DiskGroup) => {
+    const groupDisks = group.disks;
+    const groupLaudos = group.laudos || [];
     const isIncremental = migration.isIncremental;
+
     const totalPastas = isIncremental
       ? Math.max(0, ...groupDisks.map(d => parseNum(d.totalPastas)))
       : groupDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0);
@@ -124,7 +136,14 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
     const storageEnviado = groupDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0);
     const progresso = totalPastas > 0 ? Number(((pastasRealizadas / totalPastas) * 100).toFixed(2)) : 0;
 
-    return { totalPastas, pastasRealizadas, estudosEnviados, storageMapeado, storageEnviado, progresso };
+    const totalLaudos = groupLaudos.reduce((acc, l) => acc + parseNum(l.total), 0);
+    const laudosRealizados = groupLaudos.reduce((acc, l) => acc + parseNum(l.realizados), 0);
+    const progressoLaudos = totalLaudos > 0 ? Number(((laudosRealizados / totalLaudos) * 100).toFixed(2)) : 0;
+
+    return { 
+      totalPastas, pastasRealizadas, estudosEnviados, storageMapeado, storageEnviado, progresso,
+      totalLaudos, laudosRealizados, progressoLaudos 
+    };
   };
 
   const addGroup = () => {
@@ -511,16 +530,18 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
     setIsGeneratingInsight(true);
     try {
       const diskContext = allDisks.map(d => {
-        let ctx = `- Caminho: ${d.path}, Status: ${d.status}, Pastas: ${d.pastasRealizadas}/${d.totalPastas}, Storage: ${d.storageEnviado}/${d.storageMapeado} TB`;
-        if (d.comment) {
-          ctx += ` | COMENTÁRIO TÉCNICO: [${d.comment.severity.toUpperCase()}] ${d.comment.text}`;
-        }
-        return ctx;
+        const prog = d.totalPastas > 0 ? Math.round((parseNum(d.pastasRealizadas) / parseNum(d.totalPastas)) * 100) : 0;
+        return `- Path: ${d.path}, Status: ${d.status}, Progresso: ${prog}%, Obs: ${d.comment?.text || 'Nenhuma'}`;
+      }).join('\n');
+
+      const laudoContext = allLaudos.map(l => {
+        return `- Período: ${l.periodo}, Status: ${l.status}, Laudos: ${l.realizados}/${l.total}`;
       }).join('\n');
 
       const prompt = `Gere um resumo executivo técnico conciso e elegante para a migração do cliente ${migration.clientName}. 
-      Contexto dos discos e observações técnicas:\n${diskContext}\n
-      Destaque o progresso total (${summary.progresso}%), identifique gargalos potenciais (especialmente aqueles marcados com alta prioridade ou urgente) e forneça recomendações estratégicas baseadas nos comentários técnicos. 
+      ${allDisks.length > 0 ? `Contexto dos discos e observações técnicas:\n${diskContext}\n` : ''}
+      ${allLaudos.length > 0 ? `Contexto dos laudos:\n${laudoContext}\n` : ''}
+      Destaque o progresso total (${allDisks.length > 0 ? summary.progresso : summary.progressoLaudos}%)${allDisks.length > 0 ? ', identifique gargalos potenciais (especialmente aqueles marcados com alta prioridade ou urgente)' : ''} e forneça recomendações estratégicas. 
       Use markdown para formatação (**negrito**, listas, etc). Seja direto e profissional.`;
 
       const res = await fetch('/api/ai', {
@@ -563,57 +584,66 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
             <button onClick={generateAISummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all">IA Insight</button>
           </div>
         </div>
-        <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Estudos</p>
-            <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.estudosEnviados.toLocaleString()}</h4>
-          </div>
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Volume Mapeado</p>
-            <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.storageMapeado.toFixed(2)} <span className="text-xs text-slate-400">TB</span></h4>
-          </div>
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Volume Enviado</p>
-            <h4 className="text-2xl font-black text-emerald-600 tracking-tighter">{summary.storageEnviado.toFixed(2)} <span className="text-xs text-slate-400">TB</span></h4>
-          </div>
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso Global</p>
-            <div className="flex items-end gap-2">
-              <h4 className={`text-2xl font-black tracking-tighter ${summary.progresso === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{summary.progresso}%</h4>
-              <div className="w-full h-1.5 bg-slate-200 rounded-full mb-2 overflow-hidden">
-                <div className={`h-full ${summary.progresso === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${summary.progresso}%` }} />
+        <div className="p-6 space-y-6">
+          {allDisks.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Estudos</p>
+                <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.estudosEnviados.toLocaleString()}</h4>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Volume Mapeado</p>
+                <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.storageMapeado.toFixed(2)} <span className="text-xs text-slate-400">TB</span></h4>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Volume Enviado</p>
+                <h4 className="text-2xl font-black text-emerald-600 tracking-tighter">{summary.storageEnviado.toFixed(2)} <span className="text-xs text-slate-400">TB</span></h4>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso Global</p>
+                <div className="flex items-center gap-2">
+                  <h4 className={`text-2xl font-black tracking-tighter ${summary.progresso >= 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{summary.progresso}%</h4>
+                  <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div className={`h-full transition-all duration-1000 ${summary.progresso >= 100 ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${summary.progresso}%` }} />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {allDisks.length > 0 && allLaudos.length > 0 && <div className="h-px bg-slate-100 mx-[-24px]" />}
+
+          {allLaudos.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Laudos</p>
+                <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.totalLaudos.toLocaleString()}</h4>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Laudos Realizados</p>
+                <h4 className="text-2xl font-black text-emerald-600 tracking-tighter">{summary.laudosRealizados.toLocaleString()}</h4>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Períodos</p>
+                <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{allLaudos.length}</h4>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso Laudos</p>
+                <div className="flex items-center gap-2">
+                  <h4 className={`text-2xl font-black tracking-tighter ${summary.progressoLaudos >= 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{summary.progressoLaudos}%</h4>
+                  <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div className={`h-full transition-all duration-1000 ${summary.progressoLaudos >= 100 ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${summary.progressoLaudos}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-        {laudosSummary.total > 0 && (
-          <div className="px-6 pb-6 pt-0">
-            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Resumo de Laudos Clínicos</p>
-                  <p className="text-xs font-bold text-amber-600">{laudosSummary.realizados} de {laudosSummary.total} realizados</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-xl font-black text-amber-700">{laudosSummary.progresso}%</p>
-                </div>
-                <div className="w-32 h-2 bg-amber-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-500" style={{ width: `${laudosSummary.progresso}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="space-y-12">
         {editedGroups.map((group) => {
-          const groupSummary = getGroupSummary(group.disks);
+          const groupSummary = getGroupSummary(group);
           return (
             <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -636,18 +666,6 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                       <FileUp className="w-3 h-3" /> Importar
                       <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
                     </label>
-                    <button
-                      onClick={() => addDiskToGroup(group.id)}
-                      className="whitespace-nowrap text-[9px] bg-slate-900 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                    >
-                      <Plus className="w-3 h-3" /> Add Disco
-                    </button>
-                    <button
-                      onClick={() => addLaudoToGroup(group.id)}
-                      className="whitespace-nowrap text-[9px] bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                    >
-                      <Plus className="w-3 h-3" /> Add Laudo
-                    </button>
                     
                     {/* Only show 'Limpar Tudo' if there is something to clear */}
                     {(group.disks.length > 0 || (group.laudos && group.laudos.length > 0)) && (
@@ -688,28 +706,60 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
 
               {/* Unit Summary Section - Only show if there are disks or laudos */}
               {(group.disks.length > 0 || (group.laudos && group.laudos.length > 0)) && (
-                <div className="bg-slate-50/50 p-4 border-b border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudos</p>
-                    <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.estudosEnviados.toLocaleString()}</p>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mapeado (TB)</p>
-                    <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.storageMapeado.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Enviado (TB)</p>
-                    <p className="text-lg font-black text-emerald-600 tracking-tighter">{groupSummary.storageEnviado.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso Unidade</p>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-lg font-black tracking-tighter ${groupSummary.progresso >= 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{groupSummary.progresso}%</span>
-                      <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full ${groupSummary.progresso >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${groupSummary.progresso}%` }} />
+                <div className="bg-slate-50/50 p-4 border-b border-slate-100 space-y-4">
+                  {group.disks.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudos da Unidade</p>
+                        <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.estudosEnviados.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mapeado Unidade (TB)</p>
+                        <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.storageMapeado.toFixed(2)}</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Enviado Unidade (TB)</p>
+                        <p className="text-lg font-black text-emerald-600 tracking-tighter">{groupSummary.storageEnviado.toFixed(2)}</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso da Unidade</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg font-black tracking-tighter ${groupSummary.progresso >= 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{groupSummary.progresso}%</span>
+                          <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${groupSummary.progresso >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${groupSummary.progresso}%` }} />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {group.disks.length > 0 && group.laudos && group.laudos.length > 0 && <div className="h-px bg-slate-200/50" />}
+
+                  {group.laudos && group.laudos.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Laudos Unidade</p>
+                        <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.totalLaudos.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Laudos Realizados Unidade</p>
+                        <p className="text-lg font-black text-emerald-600 tracking-tighter">{groupSummary.laudosRealizados.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Períodos da Unidade</p>
+                        <p className="text-lg font-black text-slate-900 tracking-tighter">{group.laudos?.length || 0}</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso Laudos Unidade</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg font-black tracking-tighter ${groupSummary.progressoLaudos >= 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{groupSummary.progressoLaudos}%</span>
+                          <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${groupSummary.progressoLaudos >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${groupSummary.progressoLaudos}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1010,6 +1060,20 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                 </div>
               )}
 
+              {!isGuest && (
+                <div className="p-6 flex justify-center bg-slate-50/20 border-t border-slate-50">
+                  <button
+                    onClick={() => addDiskToGroup(group.id)}
+                    className="flex items-center gap-3 text-slate-400 hover:text-blue-600 transition-all group"
+                  >
+                    <div className="p-2 rounded-xl bg-white border border-slate-200 group-hover:border-blue-200 group-hover:shadow-md transition-all">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Adicionar Novo Disco / Diretório à Unidade</span>
+                  </button>
+                </div>
+              )}
+
               {/* Laudos Table Section */}
               {group.laudos && group.laudos.length > 0 && (
                 <div className={`mt-0 pt-0 ${group.disks.length > 0 ? 'mt-8 pt-8 border-t border-slate-100' : ''}`}>
@@ -1023,68 +1087,15 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Acompanhamento por Período</p>
                       </div>
                     </div>
-                    <div className="flex flex-col md:flex-row items-start md:items-center gap-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Status Global da Unidade</span>
-                        <div className="flex items-center gap-3">
-                          <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${(((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%` }}
-                              className="h-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]"
-                            />
-                          </div>
-                          <span className="text-xs font-black text-blue-600">
-                            {(((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-4 border-l border-slate-200 pl-6">
-                        {!isGuest && (
-                          <button
-                            onClick={() => addLaudoToGroup(group.id)}
-                            className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95"
-                          >
-                            <Plus className="w-3.5 h-3.5" /> Adicionar Período
-                          </button>
-                        )}
-                        {!isGuest && group.laudos && group.laudos.length > 0 && (
-                          <button
-                            onClick={() => clearAllData(group.id)}
-                            className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline px-2"
-                          >
-                            Limpar Tudo
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Clinical Summary Cards for this Unit */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6 px-6">
-                    <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total de Laudos</p>
-                      <p className="text-xl font-black text-slate-900 font-mono">
-                        {(group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0).toLocaleString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm border-l-4 border-l-blue-600">
-                      <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">Realizados</p>
-                      <p className="text-xl font-black text-slate-900 font-mono">
-                        {(group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0).toLocaleString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm border-l-4 border-l-amber-500">
-                      <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">Pendente</p>
-                      <p className="text-xl font-black text-slate-900 font-mono">
-                        {((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) - (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0)).toLocaleString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-900/20">
-                      <p className="text-[9px] font-black text-blue-100 uppercase tracking-widest mb-1">Progresso Final</p>
-                      <p className="text-xl font-black text-white font-mono">
-                        {(((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%
-                      </p>
+                    <div className="flex items-center gap-4">
+                      {!isGuest && group.laudos && group.laudos.length > 0 && (
+                        <button
+                          onClick={() => clearAllData(group.id)}
+                          className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline px-2"
+                        >
+                          Limpar Tudo
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1163,10 +1174,24 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                       </table>
                     </div>
                   </div>
+
+                  {!isGuest && (
+                    <div className="p-6 flex justify-center bg-slate-50/20 border-t border-slate-50">
+                      <button
+                        onClick={() => addLaudoToGroup(group.id)}
+                        className="flex items-center gap-3 text-slate-400 hover:text-blue-600 transition-all group"
+                      >
+                        <div className="p-2 rounded-xl bg-white border border-slate-200 group-hover:border-blue-200 group-hover:shadow-md transition-all">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Adicionar Novo Período de Laudos</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {!isGuest && group.disks.length > 0 && (!group.laudos || group.laudos.length === 0) && (
+              {!isGuest && (!group.laudos || group.laudos.length === 0) && (
                 <div className="p-8 flex justify-center border-t border-slate-50 bg-slate-50/30">
                   <button
                     onClick={() => addLaudoToGroup(group.id)}

@@ -4,6 +4,7 @@ import {
   Edit2, 
   Trash2, 
   HardDrive, 
+  FileText,
   ChevronUp, 
   ChevronDown, 
   ArrowUpDown 
@@ -47,14 +48,34 @@ export default function MigrationsView({
 
         if (sortConfig.key === 'progress') {
           const disksA = getAllDisks(a);
-          const totalA = disksA.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
-          const realizedA = disksA.reduce((sum: number, d: any) => sum + Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas)), 0);
-          aValue = totalA > 0 ? realizedA / totalA : 0;
+          const tDA = disksA.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
+          const rDA = disksA.reduce((sum: number, d: any) => sum + Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas)), 0);
+          const pDA = tDA > 0 ? rDA / tDA : 0;
+
+          const laudosA = a.groups?.flatMap((g: any) => g.laudos || []) || [];
+          const tLA = laudosA.reduce((acc: number, l: any) => acc + parseNum(l.total), 0);
+          const rLA = laudosA.reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0);
+          const pLA = tLA > 0 ? rLA / tLA : 0;
+
+          let countA = 0; let sumA = 0;
+          if (tDA > 0) { countA++; sumA += pDA; }
+          if (tLA > 0) { countA++; sumA += pLA; }
+          aValue = countA > 0 ? sumA / countA : 0;
 
           const disksB = getAllDisks(b);
-          const totalB = disksB.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
-          const realizedB = disksB.reduce((sum: number, d: any) => sum + Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas)), 0);
-          bValue = totalB > 0 ? realizedB / totalB : 0;
+          const tDB = disksB.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
+          const rDB = disksB.reduce((sum: number, d: any) => sum + Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas)), 0);
+          const pDB = tDB > 0 ? rDB / tDB : 0;
+
+          const laudosB = b.groups?.flatMap((g: any) => g.laudos || []) || [];
+          const tLB = laudosB.reduce((acc: number, l: any) => acc + parseNum(l.total), 0);
+          const rLB = laudosB.reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0);
+          const pLB = tLB > 0 ? rLB / tLB : 0;
+
+          let countB = 0; let sumB = 0;
+          if (tDB > 0) { countB++; sumB += pDB; }
+          if (tLB > 0) { countB++; sumB += pLB; }
+          bValue = countB > 0 ? sumB / countB : 0;
         }
 
         if (typeof aValue === 'string') aValue = aValue.toLowerCase();
@@ -147,15 +168,38 @@ export default function MigrationsView({
                 </span>
               </div>
               <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <span>Progresso</span>
-                    <span className="text-slate-900">{progress}%</span>
+                {total > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <span>Progresso Imagens</span>
+                      <span className="text-slate-900">{progress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} />
+                    </div>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} />
-                  </div>
-                </div>
+                )}
+                
+                {(() => {
+                  const allLaudos = m.groups?.flatMap((g: any) => g.laudos || []) || [];
+                  const tL = allLaudos.reduce((acc: number, l: any) => acc + parseNum(l.total), 0);
+                  const rL = allLaudos.reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0);
+                  const pL = tL > 0 ? Math.round((rL / tL) * 100) : 0;
+                  
+                  if (tL === 0) return null;
+                  
+                  return (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span>Progresso Laudos</span>
+                        <span className="text-slate-900">{pL}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full transition-all duration-1000 ${pL === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${pL}%` }} />
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between items-center pt-2 border-t border-slate-50">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     📅 {m.endDate || '...'}
@@ -238,27 +282,60 @@ export default function MigrationsView({
                   </button>
                 </td>
                 <td className="px-6 py-4 overflow-hidden">
-                  <p className="text-xs text-slate-600 leading-relaxed italic truncate">{m.description || 'Nenhuma descrição'}</p>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-slate-600 leading-relaxed italic truncate">{m.description || 'Nenhuma descrição'}</p>
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const hasImages = getAllDisks(m).length > 0;
+                        const hasLaudos = (m.groups?.flatMap((g: any) => g.laudos || []) || []).length > 0;
+                        return (
+                          <>
+                            {hasImages && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[8px] font-black uppercase tracking-widest">
+                                <HardDrive className="w-2.5 h-2.5" /> Imagens
+                              </span>
+                            )}
+                            {hasLaudos && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 rounded text-[8px] font-black uppercase tracking-widest">
+                                <FileText className="w-2.5 h-2.5" /> Laudos
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 </td>
                 <td className="px-6 py-4">
                   {(() => {
                     const allDisks = getAllDisks(m);
-                    const total = allDisks.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
-                    const realized = allDisks.reduce((sum: number, d: any) => {
-                      const t = parseNum(d.totalPastas);
-                      const r = parseNum(d.pastasRealizadas);
-                      return sum + Math.min(r, t);
-                    }, 0);
-                    const progress = total > 0 ? Math.round((realized / total) * 100) : 0;
+                    const tD = allDisks.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
+                    const rD = allDisks.reduce((sum: number, d: any) => sum + Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas)), 0);
+                    const pD = tD > 0 ? Math.round((rD / tD) * 100) : 0;
+
+                    const allLaudos = m.groups?.flatMap((g: any) => g.laudos || []) || [];
+                    const tL = allLaudos.reduce((acc: number, l: any) => acc + parseNum(l.total), 0);
+                    const rL = allLaudos.reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0);
+                    const pL = tL > 0 ? Math.round((rL / tL) * 100) : 0;
+
                     return (
-                      <div className="flex items-center justify-center gap-3 w-full">
-                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-[100px]">
-                          <div
-                            className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-600'}`}
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                        <span className={`text-[10px] font-black min-w-[30px] ${progress === 100 ? 'text-emerald-600' : 'text-slate-900'}`}>{progress}%</span>
+                      <div className="flex flex-col gap-2">
+                        {tD > 0 && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className={`h-full transition-all duration-1000 ${pD === 100 ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${pD}%` }} />
+                            </div>
+                            <span className={`text-[9px] font-black min-w-[24px] ${pD === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>{pD}%</span>
+                          </div>
+                        )}
+                        {tL > 0 && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className={`h-full transition-all duration-1000 ${pL === 100 ? 'bg-emerald-500' : 'bg-amber-600'}`} style={{ width: `${pL}%` }} />
+                            </div>
+                            <span className={`text-[9px] font-black min-w-[24px] ${pL === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{pL}%</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}

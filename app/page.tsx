@@ -433,12 +433,17 @@ function DashboardContent() {
   const aggregatedData = migrations.reduce((acc: any, m: any) => {
     const clientName = getClientName(m, clients);
     const allDisks = getAllDisks(m);
+    const allLaudos = (m.groups || []).flatMap((g: any) => g.laudos || []);
+    
     const studies = m.isIncremental ? Math.max(0, ...allDisks.map((d: any) => Number(d.estudos) || 0)) : allDisks.reduce((sum: number, d: any) => sum + (Number(d.estudos) || 0), 0);
     const folders = m.isIncremental ? Math.max(0, ...allDisks.map((d: any) => Math.max(Number(d.totalPastas) || 0, Number(d.pastasRealizadas) || 0))) : allDisks.reduce((sum: number, d: any) => sum + Math.max(Number(d.totalPastas) || 0, Number(d.pastasRealizadas) || 0), 0);
-    if (!acc[clientName]) acc[clientName] = { name: clientName, estudos: 0, pastas: 0, volume: 0 };
+    const laudos = allLaudos.reduce((sum: number, l: any) => sum + (Number(l.total) || 0), 0);
+    
+    if (!acc[clientName]) acc[clientName] = { name: clientName, estudos: 0, pastas: 0, volume: 0, laudos: 0 };
     acc[clientName].estudos += studies;
     acc[clientName].pastas += folders;
     acc[clientName].volume += allDisks.reduce((sum: number, d: any) => sum + (Number(d.storageMapeado) || 0), 0);
+    acc[clientName].laudos += laudos;
     return acc;
   }, {});
 
