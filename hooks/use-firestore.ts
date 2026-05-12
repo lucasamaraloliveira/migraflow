@@ -89,10 +89,19 @@ export interface Disk {
   };
 }
 
+export interface Laudo {
+  id?: string;
+  periodo: string;
+  status: 'Pendente' | 'Realizado' | 'Em Andamento';
+  realizados: number;
+  total: number;
+}
+
 export interface DiskGroup {
   id: string;
   title: string;
   disks: Disk[];
+  laudos?: Laudo[];
 }
 
 export interface Migration {

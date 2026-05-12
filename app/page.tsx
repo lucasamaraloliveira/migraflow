@@ -33,11 +33,12 @@ import {
   Check,
   Bold,
   Underline,
-  Type
+  Type,
+  FilePlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
-import { useClients, useMigrations, Disk, DiskGroup } from '@/hooks/use-firestore';
+import { useClients, useMigrations, Disk, DiskGroup, Laudo } from '@/hooks/use-firestore';
 import { format } from 'date-fns';
 // Removed client-side GoogleGenAI import for security
 import {
@@ -227,8 +228,18 @@ function DashboardContent() {
       { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 20 }
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, "Modelo_MigraFlow");
-    XLSX.writeFile(wb, "migraflow_modelo_importacao.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Modelo_Discos");
+
+    const laudoHeaders = [
+      ['Período', 'Status', 'Realizados', 'Total'],
+      ['Novembro - 2024', 'Realizado', '3429', '3429'],
+      ['Outubro - 2024', 'Realizado', '4702', '4702']
+    ];
+    const wsLaudos = XLSX.utils.aoa_to_sheet(laudoHeaders);
+    wsLaudos['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, wsLaudos, "Modelo_Laudos");
+
+    XLSX.writeFile(wb, "migraflow_modelos_importacao.xlsx");
   };
 
   // Stats
@@ -695,6 +706,7 @@ function DashboardContent() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
+
                 {/* Mobile Card Layout for Clients */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                   {clients.map((client) => (
@@ -1032,68 +1044,68 @@ function DashboardContent() {
             )}
           </AnimatePresence>
         </div>
+      </main>
 
-        {/* AI Floating Trigger (Desktop Only) */}
-        {!isGuest && (
-          <button
-            onClick={() => setIsChatOpen(true)}
-            className="hidden md:flex fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white w-16 h-16 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-110 active:scale-95 flex-col items-center justify-center z-30 group"
-          >
-            <div className="relative mb-1">
-              <MessageSquare className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
-              <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-            </div>
-            <span className="font-black text-[10px] uppercase tracking-[0.15em] opacity-80">IA</span>
-          </button>
-        )}
+      {/* AI Floating Trigger (Desktop Only) */}
+      {!isGuest && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="hidden md:flex fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white w-16 h-16 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-110 active:scale-95 flex-col items-center justify-center z-30 group"
+        >
+          <div className="relative mb-1">
+            <MessageSquare className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
+            <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+          </div>
+          <span className="font-black text-[10px] uppercase tracking-[0.15em] opacity-80">IA</span>
+        </button>
+      )}
 
-        {/* Modals & AI Panel (Drawer Side) */}
-        <MigrationModal isOpen={isMigrationModalOpen} onClose={() => setIsMigrationModalOpen(false)} clients={clients} onAdd={addMigration} isGuest={isGuest} />
-        <ClientModal
-          isOpen={isClientModalOpen}
-          onClose={() => {
-            setIsClientModalOpen(false);
-            setClientToEdit(null);
-          }}
-          onAdd={addClient}
-          onUpdate={updateClient}
-          clientToEdit={clientToEdit}
-          isGuest={isGuest}
+      {/* Modals & AI Panel (Drawer Side) */}
+      <MigrationModal isOpen={isMigrationModalOpen} onClose={() => setIsMigrationModalOpen(false)} clients={clients} onAdd={addMigration} isGuest={isGuest} />
+      <ClientModal
+        isOpen={isClientModalOpen}
+        onClose={() => {
+          setIsClientModalOpen(false);
+          setClientToEdit(null);
+        }}
+        onAdd={addClient}
+        onUpdate={updateClient}
+        clientToEdit={clientToEdit}
+        isGuest={isGuest}
+      />
+      {!isGuest && (
+        <AIChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} migrations={migrations} isGuest={isGuest} />
+      )}
+
+      {/* Bottom Navigation for Mobile */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-4 py-4 flex items-center justify-around z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
+        <BottomNavLink
+          icon={BarChart3}
+          label="Painel"
+          active={activeTab === 'overview'}
+          onClick={() => { setActiveTab('overview'); setSelectedMigrationId(null); }}
+        />
+        <BottomNavLink
+          icon={Users}
+          label="Clientes"
+          active={activeTab === 'clients'}
+          onClick={() => { setActiveTab('clients'); setSelectedMigrationId(null); }}
+        />
+        <BottomNavLink
+          icon={FileUp}
+          label="Migrações"
+          active={activeTab === 'migrations'}
+          onClick={() => { setActiveTab('migrations'); setSelectedMigrationId(null); }}
         />
         {!isGuest && (
-          <AIChatDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} migrations={migrations} isGuest={isGuest} />
+          <BottomNavLink
+            icon={Sparkles}
+            label="IA"
+            active={isChatOpen}
+            onClick={() => setIsChatOpen(true)}
+          />
         )}
-
-        {/* Bottom Navigation for Mobile */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-4 py-4 flex items-center justify-around z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
-          <BottomNavLink
-            icon={BarChart3}
-            label="Painel"
-            active={activeTab === 'overview'}
-            onClick={() => { setActiveTab('overview'); setSelectedMigrationId(null); }}
-          />
-          <BottomNavLink
-            icon={Users}
-            label="Clientes"
-            active={activeTab === 'clients'}
-            onClick={() => { setActiveTab('clients'); setSelectedMigrationId(null); }}
-          />
-          <BottomNavLink
-            icon={FileUp}
-            label="Migrações"
-            active={activeTab === 'migrations'}
-            onClick={() => { setActiveTab('migrations'); setSelectedMigrationId(null); }}
-          />
-          {!isGuest && (
-            <BottomNavLink
-              icon={Sparkles}
-              label="IA"
-              active={isChatOpen}
-              onClick={() => setIsChatOpen(true)}
-            />
-          )}
-        </nav>
-      </main>
+      </nav>
 
       {/* Global Undo Toast */}
       <AnimatePresence>
@@ -1931,9 +1943,13 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
   // Security: Delete Confirmation & Undo
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ groupId: string, diskIdx: number } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ groupId: string, idx: number, type: 'disk' | 'laudo' } | null>(null);
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ groupId: string, type: 'disks' | 'laudos' } | null>(null);
   const [lastDeletedDisk, setLastDeletedDisk] = useState<{ groupId: string, disk: Disk, idx: number } | null>(null);
+  const [lastDeletedLaudo, setLastDeletedLaudo] = useState<{ groupId: string, laudo: Laudo, idx: number } | null>(null);
+  const [lastBulkDelete, setLastBulkDelete] = useState<{ groupId: string, type: 'disks' | 'laudos', items: any[] } | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
+  const [undoType, setUndoType] = useState<'disk' | 'laudo' | 'bulk'>('disk');
 
   useEffect(() => {
     setEditedGroups(migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }]));
@@ -1970,6 +1986,14 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   const total = summary.totalPastas;
   const realized = summary.pastasRealizadas;
   summary.progresso = total > 0 ? Number(((realized / total) * 100).toFixed(2)) : 0;
+
+  const allLaudos = editedGroups.flatMap(g => g.laudos || []);
+  const laudosSummary = {
+    total: allLaudos.reduce((acc, l) => acc + parseNum(l.total), 0),
+    realizados: allLaudos.reduce((acc, l) => acc + parseNum(l.realizados), 0),
+    progresso: 0
+  };
+  laudosSummary.progresso = laudosSummary.total > 0 ? Number(((laudosSummary.realizados / laudosSummary.total) * 100).toFixed(2)) : 0;
 
   const getGroupSummary = (groupDisks: Disk[]) => {
     const totalPastas = groupDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0);
@@ -2018,27 +2042,40 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
   const askRemoveDisk = (groupId: string, diskIdx: number) => {
     if (isGuest) return;
-    setDeleteTarget({ groupId, diskIdx });
+    setDeleteTarget({ groupId, idx: diskIdx, type: 'disk' });
     setIsDeleteConfirmOpen(true);
   };
 
-  const confirmRemoveDisk = () => {
+  const askRemoveLaudo = (groupId: string, laudoIdx: number) => {
+    if (isGuest) return;
+    setDeleteTarget({ groupId, idx: laudoIdx, type: 'laudo' });
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmRemoveItem = () => {
     if (!deleteTarget || isGuest) return;
-    const { groupId, diskIdx } = deleteTarget;
+    const { groupId, idx, type } = deleteTarget;
     
     const group = editedGroups.find(g => g.id === groupId);
     if (!group) return;
     
-    const diskToDelete = group.disks[diskIdx];
-    
-    // Save for undo
-    setLastDeletedDisk({ groupId, disk: diskToDelete, idx: diskIdx });
-    
-    // Remove
-    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
-      ...g,
-      disks: g.disks.filter((_: Disk, i: number) => i !== diskIdx)
-    } : g));
+    if (type === 'disk') {
+      const diskToDelete = group.disks[idx];
+      setLastDeletedDisk({ groupId, disk: diskToDelete, idx });
+      setUndoType('disk');
+      setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+        ...g,
+        disks: g.disks.filter((_: Disk, i: number) => i !== idx)
+      } : g));
+    } else {
+      const laudoToDelete = (group.laudos || [])[idx];
+      setLastDeletedLaudo({ groupId, laudo: laudoToDelete, idx });
+      setUndoType('laudo');
+      setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+        ...g,
+        laudos: (g.laudos || []).filter((_: Laudo, i: number) => i !== idx)
+      } : g));
+    }
     
     setIsEditing(true);
     setIsDeleteConfirmOpen(false);
@@ -2049,16 +2086,60 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
     setTimeout(() => setShowUndoToast(false), 8000); // 8 seconds to undo
   };
 
-  const undoDelete = () => {
-    if (!lastDeletedDisk || isGuest) return;
-    const { groupId, disk, idx } = lastDeletedDisk;
+  const confirmBulkDelete = () => {
+    if (!bulkDeleteTarget || isGuest) return;
+    const { groupId, type } = bulkDeleteTarget;
     
+    const group = editedGroups.find(g => g.id === groupId);
+    if (!group) return;
+    
+    const items = type === 'disks' ? group.disks : (group.laudos || []);
+    
+    // Save for undo
+    setLastBulkDelete({ groupId, type, items });
+    setUndoType('bulk');
+    
+    // Clear
     setEditedGroups(editedGroups.map(g => g.id === groupId ? {
       ...g,
-      disks: [...g.disks.slice(0, idx), disk, ...g.disks.slice(idx)]
+      [type]: []
     } : g));
     
-    setLastDeletedDisk(null);
+    setIsEditing(true);
+    setIsDeleteConfirmOpen(false);
+    setBulkDeleteTarget(null);
+    
+    // Show undo toast
+    setShowUndoToast(true);
+    setTimeout(() => setShowUndoToast(false), 8000);
+  };
+
+  const undoDelete = () => {
+    if (isGuest) return;
+    
+    if (undoType === 'disk' && lastDeletedDisk) {
+      const { groupId, disk, idx } = lastDeletedDisk;
+      setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+        ...g,
+        disks: [...g.disks.slice(0, idx), disk, ...g.disks.slice(idx)]
+      } : g));
+      setLastDeletedDisk(null);
+    } else if (undoType === 'laudo' && lastDeletedLaudo) {
+      const { groupId, laudo, idx } = lastDeletedLaudo;
+      setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+        ...g,
+        laudos: [...(g.laudos || []).slice(0, idx), laudo, ...(g.laudos || []).slice(idx)]
+      } : g));
+      setLastDeletedLaudo(null);
+    } else if (undoType === 'bulk' && lastBulkDelete) {
+      const { groupId, type, items } = lastBulkDelete;
+      setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+        ...g,
+        [type]: items
+      } : g));
+      setLastBulkDelete(null);
+    }
+    
     setShowUndoToast(false);
   };
 
@@ -2073,6 +2154,46 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       disks: g.disks.map((d: Disk, i: number) => i === diskIdx ? { ...d, ...data } : d)
     } : g));
     setIsEditing(true);
+  };
+
+  const addLaudoToGroup = (groupId: string) => {
+    if (isGuest) return;
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+      ...g,
+      laudos: [...(g.laudos || []), {
+        id: crypto.randomUUID(),
+        periodo: '',
+        status: 'Pendente',
+        realizados: 0,
+        total: 0
+      }]
+    } : g));
+    setIsEditing(true);
+  };
+
+  const removeLaudoFromGroup = (groupId: string, laudoIdx: number) => {
+    askRemoveLaudo(groupId, laudoIdx);
+  };
+
+  const updateLaudoInGroup = (groupId: string, laudoId: string, data: Partial<Laudo>) => {
+    if (isGuest) return;
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+      ...g,
+      laudos: (g.laudos || []).map(l => l.id === laudoId ? { ...l, ...data } : l)
+    } : g));
+    setIsEditing(true);
+  };
+
+  const clearAllDisks = (groupId: string) => {
+    if (isGuest) return;
+    setBulkDeleteTarget({ groupId, type: 'disks' });
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const clearAllLaudos = (groupId: string) => {
+    if (isGuest) return;
+    setBulkDeleteTarget({ groupId, type: 'laudos' });
+    setIsDeleteConfirmOpen(true);
   };
 
   const saveComment = () => {
@@ -2121,15 +2242,18 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       const ws = wb.Sheets[wsname];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
 
+      // Detect if it's Disks or Laudos
+      const isLaudos = rows.some(r => r.some(c => String(c || '').toLowerCase().includes('período') || String(c || '').toLowerCase().includes('periodo')));
+
       const headerRowIdx = rows.findIndex(r =>
         r.some(c => {
           const val = String(c || '').toLowerCase();
-          return val.includes('caminho') || val.includes('path');
+          return isLaudos ? (val.includes('período') || val.includes('periodo')) : (val.includes('caminho') || val.includes('path'));
         })
       );
 
       if (headerRowIdx === -1) {
-        alert("Não foi possível encontrar a coluna 'Caminho' na planilha.");
+        alert("Não foi possível encontrar o cabeçalho correto na planilha.");
         return;
       }
 
@@ -2146,72 +2270,104 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
         if (typeof val === 'number') return val;
         if (!val) return 0;
         const s = String(val).replace(/[^\d,.-]/g, '');
-        // Se contém vírgula, tratamos como formato brasileiro (ex: 1.234,56)
         if (s.includes(',')) {
           const cleanVal = s.replace(/\./g, '').replace(',', '.');
           return parseFloat(cleanVal) || 0;
         }
-        // Caso contrário, tratamos como formato padrão
         return parseFloat(s) || 0;
       };
 
-      let lastCumulative = 0;
-      let lastMapeado = 0;
-      let lastEnviado = 0;
+      if (isLaudos) {
+        const perIdx = findIdx(['período', 'periodo', 'mês', 'mes', 'data']);
+        const statusIdx = findIdx(['status']);
+        const realIdx = findIdx(['realizados', 'concluídos', 'realizac']);
+        const totIdx = findIdx(['total', 'meta']);
 
-      const importedDisks: Disk[] = dataRows
-        .filter(row => row.length > 0 && row[findIdx(['caminho', 'path'])])
-        .map(row => {
-          const pathIdx = findIdx(['caminho', 'path', 'disco', 'origem']);
-          const statusIdx = findIdx(['status']);
-          const realIdx = findIdx(['realizac', 'realizadas', 'migradas', 'realizados']);
-          const estIdx = findIdx(['estudos', 'exames']);
-          const sendIdx = findIdx(['send', 'enviado']);
-          const totIdx = findIdx(['total pastas', 'total']);
-          const mapIdx = findIdx(['storage mapeado', 'mapeado', 'tamanho']);
-          const envIdx = findIdx(['storage enviado', 'enviado']);
-          const destIdx = findIdx(['destino', 'destination', 'target']);
+        const importedLaudos: Laudo[] = dataRows
+          .filter(row => row.length > 0)
+          .map(row => {
+            let periodoVal = '';
+            if (perIdx !== -1) {
+              const rawVal = row[perIdx];
+              if (rawVal instanceof Date) {
+                periodoVal = format(rawVal, 'MM/yyyy');
+              } else if (typeof rawVal === 'number' && rawVal > 1000) {
+                // Handle Excel serial date
+                const date = XLSX.SSF.parse_date_code(rawVal);
+                periodoVal = `${String(date.m).padStart(2, '0')}/${date.y}`;
+              } else {
+                periodoVal = String(rawVal || '');
+              }
+            }
 
-          const currentPath = String(pathIdx !== -1 ? row[pathIdx] : '');
-          const currentCumulative = sanitizeNum(realIdx !== -1 ? row[realIdx] : 0);
-          const total = sanitizeNum(totIdx !== -1 ? row[totIdx] : 0);
-          const currentMapeado = sanitizeNum(mapIdx !== -1 ? row[mapIdx] : 0);
-          const currentEnviado = sanitizeNum(envIdx !== -1 ? row[envIdx] : 0);
+            return {
+              id: crypto.randomUUID(),
+              periodo: periodoVal,
+              status: (String(statusIdx !== -1 ? (row[statusIdx] || '') : '').toLowerCase().includes('realizado') ? 'Realizado' : 'Pendente') as any,
+              realizados: sanitizeNum(realIdx !== -1 ? row[realIdx] : 0),
+              total: sanitizeNum(totIdx !== -1 ? row[totIdx] : 0)
+            };
+          })
+          .filter(l => l.periodo || l.total > 0);
 
-          // Lógica de incremento (Choice 1 corrigida: extraímos o incremento da planilha cumulativa)
-          if (currentMapeado < lastMapeado) lastMapeado = 0;
-          if (currentEnviado < lastEnviado) lastEnviado = 0;
-          
-          const individualMapeado = Math.max(0, currentMapeado - lastMapeado);
-          const individualEnviado = Math.max(0, currentEnviado - lastEnviado);
-          
-          lastMapeado = currentMapeado;
-          lastEnviado = currentEnviado;
+        setEditedGroups(prev => prev.map(g => g.id === groupId ? { ...g, laudos: [...(g.laudos || []), ...importedLaudos] } : g));
+      } else {
+        let lastCumulative = 0;
+        let lastMapeado = 0;
+        let lastEnviado = 0;
 
-          if (currentCumulative < lastCumulative) lastCumulative = 0;
-          const individualRealized = Math.max(0, currentCumulative - lastCumulative);
-          lastCumulative = currentCumulative;
+        const importedDisks: Disk[] = dataRows
+          .filter(row => row.length > 0 && row[findIdx(['caminho', 'path'])])
+          .map(row => {
+            const pathIdx = findIdx(['caminho', 'path', 'disco', 'origem']);
+            const statusIdx = findIdx(['status']);
+            const realIdx = findIdx(['realizac', 'realizadas', 'migradas', 'realizados']);
+            const estIdx = findIdx(['estudos', 'exames']);
+            const sendIdx = findIdx(['send', 'enviado']);
+            const totIdx = findIdx(['total pastas', 'total']);
+            const mapIdx = findIdx(['storage mapeado', 'mapeado', 'tamanho']);
+            const envIdx = findIdx(['storage enviado', 'enviado']);
+            const destIdx = findIdx(['destino', 'destination', 'target']);
 
-          const statusVal = String(statusIdx !== -1 ? row[statusIdx] : '').toLowerCase();
-          const isFinished = statusVal.includes('realizado') || statusVal.includes('concluido') || statusVal.includes('finalizado') || (individualRealized >= total && total > 0);
+            const currentPath = String(pathIdx !== -1 ? row[pathIdx] : '');
+            const currentCumulative = sanitizeNum(realIdx !== -1 ? row[realIdx] : 0);
+            const total = sanitizeNum(totIdx !== -1 ? row[totIdx] : 0);
+            const currentMapeado = sanitizeNum(mapIdx !== -1 ? row[mapIdx] : 0);
+            const currentEnviado = sanitizeNum(envIdx !== -1 ? row[envIdx] : 0);
 
-          // Se o enviado vier zerado da planilha, assumimos que ele segue o mapeado (para não quebrar a soma)
-          const finalIndividualEnviado = individualEnviado > 0 ? individualEnviado : individualMapeado;
+            if (currentMapeado < lastMapeado) lastMapeado = 0;
+            if (currentEnviado < lastEnviado) lastEnviado = 0;
+            
+            const individualMapeado = Math.max(0, currentMapeado - lastMapeado);
+            const individualEnviado = Math.max(0, currentEnviado - lastEnviado);
+            
+            lastMapeado = currentMapeado;
+            lastEnviado = currentEnviado;
 
-          return {
-            path: currentPath,
-            status: isFinished ? 'Realizado' : 'Pendente',
-            pastasRealizadas: isFinished ? total : individualRealized,
-            estudos: sanitizeNum(estIdx !== -1 ? row[estIdx] : 0),
-            send: sanitizeNum(sendIdx !== -1 ? row[sendIdx] : 0),
-            totalPastas: total,
-            storageMapeado: individualMapeado,
-            storageEnviado: finalIndividualEnviado,
-            destination: destIdx !== -1 ? String(row[destIdx]) : undefined
-          };
-        });
+            if (currentCumulative < lastCumulative) lastCumulative = 0;
+            const individualRealized = Math.max(0, currentCumulative - lastCumulative);
+            lastCumulative = currentCumulative;
 
-      setEditedGroups(prev => prev.map(g => g.id === groupId ? { ...g, disks: [...g.disks, ...importedDisks] } : g));
+            const statusVal = String(statusIdx !== -1 ? row[statusIdx] : '').toLowerCase();
+            const isFinished = statusVal.includes('realizado') || statusVal.includes('concluido') || statusVal.includes('finalizado') || (individualRealized >= total && total > 0);
+
+            const finalIndividualEnviado = individualEnviado > 0 ? individualEnviado : individualMapeado;
+
+            return {
+              path: currentPath,
+              status: isFinished ? 'Realizado' : 'Pendente',
+              pastasRealizadas: isFinished ? total : individualRealized,
+              estudos: sanitizeNum(estIdx !== -1 ? row[estIdx] : 0),
+              send: sanitizeNum(sendIdx !== -1 ? row[sendIdx] : 0),
+              totalPastas: total,
+              storageMapeado: individualMapeado,
+              storageEnviado: finalIndividualEnviado,
+              destination: destIdx !== -1 ? String(row[destIdx]) : undefined
+            };
+          });
+
+        setEditedGroups(prev => prev.map(g => g.id === groupId ? { ...g, disks: [...g.disks, ...importedDisks] } : g));
+      }
       setIsEditing(true);
     };
     reader.readAsBinaryString(file);
@@ -2303,14 +2459,14 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
               </button>
             )}
             <button
-                onClick={generateAISummary}
-                disabled={isGeneratingInsight}
-                className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 border border-blue-500/50 disabled:opacity-50"
-              >
-                <Sparkles className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isGeneratingInsight ? 'animate-pulse' : ''}`} /> 
-                <span className="hidden sm:inline">{isGeneratingInsight ? 'Gerando...' : 'IA Insight'}</span>
-                {!isGeneratingInsight && <span className="sm:hidden">IA</span>}
-              </button>
+              onClick={generateAISummary}
+              disabled={isGeneratingInsight}
+              className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 border border-blue-500/50 disabled:opacity-50"
+            >
+              <Sparkles className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isGeneratingInsight ? 'animate-pulse' : ''}`} /> 
+              <span className="hidden sm:inline">{isGeneratingInsight ? 'Gerando...' : 'IA Insight'}</span>
+              {!isGeneratingInsight && <span className="sm:hidden">IA</span>}
+            </button>
           </div>
         </div>
 
@@ -2364,64 +2520,72 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
           const groupSummary = getGroupSummary(group.disks);
           return (
             <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              {/* Group Executive Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-6 divide-x divide-slate-50 bg-slate-50/50 border-b border-slate-100">
-                <div className="p-3 flex flex-col items-center justify-center text-center">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Pastas</span>
-                  <span className="text-xs font-black text-slate-700 tracking-tighter">
-                    {groupSummary.pastasRealizadas.toLocaleString()} / {groupSummary.totalPastas.toLocaleString()}
-                  </span>
-                </div>
-                <div className="p-3 flex flex-col items-center justify-center text-center">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso</span>
-                  <span className={`text-xs font-black tracking-tighter ${groupSummary.progresso === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>
-                    {groupSummary.progresso}%
-                  </span>
-                </div>
-                <div className="p-3 flex flex-col items-center justify-center text-center">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudos</span>
-                  <span className="text-xs font-black text-slate-700 tracking-tighter">{groupSummary.estudosEnviados.toLocaleString()}</span>
-                </div>
-                <div className="p-3 flex flex-col items-center justify-center text-center">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mapeado</span>
-                  <span className="text-xs font-black text-slate-700 tracking-tighter">{groupSummary.storageMapeado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} TB</span>
-                </div>
-                <div className="p-3 flex flex-col items-center justify-center text-center">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Enviado</span>
-                  <span className="text-xs font-black text-blue-600 tracking-tighter">{groupSummary.storageEnviado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} TB</span>
-                </div>
-                <div className="p-3 flex flex-col items-center justify-center bg-slate-100/30">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Resumo Unidade</span>
-                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-500 ${groupSummary.progresso === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                      style={{ width: `${groupSummary.progresso}%` }}
-                    />
+              {/* Group Executive Summary - Only show Disks summary if there are disks or if it's not a pure Laudos unit */}
+              {group.disks.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-6 divide-x divide-slate-50 bg-slate-50/50 border-b border-slate-100">
+                  <div className="p-3 flex flex-col items-center justify-center text-center">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Pastas</span>
+                    <span className="text-xs font-black text-slate-700 tracking-tighter">
+                      {groupSummary.pastasRealizadas.toLocaleString()} / {groupSummary.totalPastas.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="p-3 flex flex-col items-center justify-center text-center">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Progresso</span>
+                    <span className={`text-xs font-black tracking-tighter ${groupSummary.progresso === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>
+                      {groupSummary.progresso}%
+                    </span>
+                  </div>
+                  <div className="p-3 flex flex-col items-center justify-center text-center">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudos</span>
+                    <span className="text-xs font-black text-slate-700 tracking-tighter">{groupSummary.estudosEnviados.toLocaleString()}</span>
+                  </div>
+                  <div className="p-3 flex flex-col items-center justify-center text-center">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mapeado</span>
+                    <span className="text-xs font-black text-slate-700 tracking-tighter">{groupSummary.storageMapeado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} TB</span>
+                  </div>
+                  <div className="p-3 flex flex-col items-center justify-center text-center">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Enviado</span>
+                    <span className="text-xs font-black text-blue-600 tracking-tighter">{groupSummary.storageEnviado.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} TB</span>
+                  </div>
+                  <div className="p-3 flex flex-col items-center justify-center bg-slate-100/30">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Resumo Unidade</span>
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${groupSummary.progresso === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                        style={{ width: `${groupSummary.progresso}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="flex items-center gap-3 flex-1 w-full">
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={group.title}
-                    onChange={e => updateGroupTitle(group.id, e.target.value)}
-                    className="bg-white border border-blue-200 rounded px-3 py-1 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                  />
-                ) : (
-                  <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2 truncate">
-                    <HardDrive className="w-4 h-4 text-blue-600 shrink-0" />
-                    {group.title}
-                  </h3>
-                )}
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest shrink-0">{group.disks.length} Discos</span>
-              </div>
-
-              <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                <div className="flex items-center gap-3 flex-1 w-full">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={group.title}
+                      onChange={e => updateGroupTitle(group.id, e.target.value)}
+                      className="bg-white border border-blue-200 rounded px-3 py-1 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                    />
+                  ) : (
+                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2 truncate">
+                      {group.disks.length > 0 ? (
+                        <HardDrive className="w-4 h-4 text-blue-600 shrink-0" />
+                      ) : (
+                        <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                      )}
+                      {group.title}
+                    </h3>
+                  )}
+                  {group.disks.length > 0 ? (
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest shrink-0">{group.disks.length} Discos</span>
+                  ) : (
+                    <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-widest shrink-0 border border-emerald-100">Unidade Clínica</span>
+                  )}
+                </div>
                 {!isGuest && (
-                  <>
+                  <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
                     <label className="whitespace-nowrap text-[9px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
                       <FileUp className="w-3 h-3" /> Importar
                       <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
@@ -2432,20 +2596,43 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                     >
                       <Plus className="w-3 h-3" /> Add Disco
                     </button>
-                  </>
-                )}
-                {!isGuest && isEditing && editedGroups.length > 1 && (
-                  <button
-                    onClick={() => removeGroup(group.id)}
-                    className="whitespace-nowrap text-[9px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
-                  >
-                    <Trash2 className="w-3 h-3" /> Remover
-                  </button>
+                    <button
+                      onClick={() => addLaudoToGroup(group.id)}
+                      className="whitespace-nowrap text-[9px] bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+                    >
+                      <Plus className="w-3 h-3" /> Add Laudo
+                    </button>
+                    <div className="w-px h-4 bg-slate-200 mx-1 hidden md:block" />
+                    <button
+                      onClick={() => clearAllDisks(group.id)}
+                      className="whitespace-nowrap text-[9px] text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                      title="Excluir todos os discos desta unidade"
+                    >
+                      <Trash2 className="w-3 h-3" /> Limpar Discos
+                    </button>
+                    <button
+                      onClick={() => clearAllLaudos(group.id)}
+                      className="whitespace-nowrap text-[9px] text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                      title="Excluir todos os laudos desta unidade"
+                    >
+                      <Trash2 className="w-3 h-3" /> Limpar Laudos
+                    </button>
+                    {isEditing && editedGroups.length > 1 && (
+                      <button
+                        onClick={() => removeGroup(group.id)}
+                        className="whitespace-nowrap text-[9px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
+                      >
+                        <Trash2 className="w-3 h-3" /> Remover
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
-
-            {/* Mobile Card Layout for Disks */}
+              
+              {/* Only show disks section if there are disks */}
+              {group.disks.length > 0 && (
+                <>
+                  {/* Mobile Card Layout for Disks */}
             <div className="grid grid-cols-1 gap-3 p-4 md:hidden bg-slate-50/30">
               {group.disks.map((d: Disk, i: number) => {
                 const previousDisks = group.disks.slice(0, i);
@@ -2765,9 +2952,183 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                     </tbody>
                   </table>
                 </div>
-              </div>
-            );
-          })}
+                </>
+              )}
+
+                {/* Laudos Table Section */}
+                {((group.laudos && group.laudos.length > 0) || group.disks.length === 0) && (
+                  <div className={`mt-0 pt-0 ${group.disks.length > 0 ? 'mt-8 pt-8 border-t border-slate-100' : ''}`}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 px-6 pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
+                          <FileText className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Relatórios Clínicos / Laudos</h4>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Acompanhamento por Período</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col md:flex-row items-start md:items-center gap-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Status Global da Unidade</span>
+                          <div className="flex items-center gap-3">
+                            <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%` }}
+                                className="h-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]"
+                              />
+                            </div>
+                            <span className="text-xs font-black text-blue-600">
+                              {(( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-4 border-l border-slate-200 pl-6">
+                          {!isGuest && (
+                            <button
+                              onClick={() => addLaudoToGroup(group.id)}
+                              className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> Adicionar Período
+                            </button>
+                          )}
+                          {!isGuest && group.laudos && group.laudos.length > 0 && (
+                            <button
+                              onClick={() => clearAllLaudos(group.id)}
+                              className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline px-2"
+                            >
+                              Limpar Tudo
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Clinical Summary Cards for this Unit */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6 px-6">
+                      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total de Laudos</p>
+                        <p className="text-xl font-black text-slate-900 font-mono">
+                          {(group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm border-l-4 border-l-blue-600">
+                        <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">Realizados</p>
+                        <p className="text-xl font-black text-slate-900 font-mono">
+                          {(group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm border-l-4 border-l-amber-500">
+                        <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">Pendente</p>
+                        <p className="text-xl font-black text-slate-900 font-mono">
+                          {((group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) - (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0)).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                      <div className="bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-900/20">
+                        <p className="text-[9px] font-black text-blue-100 uppercase tracking-widest mb-1">Progresso Final</p>
+                        <p className="text-xl font-black text-white font-mono">
+                          {(( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.realizados), 0) / ( (group.laudos || []).reduce((acc: number, l: any) => acc + parseNum(l.total), 0) || 1)) * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mx-6 mb-8 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                      <div className="bg-slate-50/50 px-6 py-3 border-b border-slate-100 flex items-center justify-between">
+                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5 text-blue-500" />
+                          Listagem Detalhada por Período
+                        </h4>
+                      </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-[#f0f2ff] text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            <th className="p-4 pl-12 w-[40%]">Período</th>
+                            <th className="p-4 text-center w-[20%]">Status</th>
+                            <th className="p-4 text-center w-[20%]">Realizados</th>
+                            <th className="p-4 text-center w-[20%] pr-12">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          { (group.laudos || []).map((laudo: Laudo, li: number) => (
+                            <tr key={laudo.id || li} className="hover:bg-slate-50/50 transition-colors group/laudo">
+                              <td className="p-4 pl-12 text-xs font-bold text-slate-700">
+                                <input 
+                                  type="text"
+                                  className="w-full bg-transparent outline-none focus:text-blue-600 border-b border-transparent focus:border-blue-200"
+                                  value={laudo.periodo}
+                                  placeholder="Mês - Ano"
+                                  onChange={e => updateLaudoInGroup(group.id, laudo.id!, { periodo: e.target.value })}
+                                  readOnly={isGuest}
+                                />
+                              </td>
+                              <td className="p-4 text-center">
+                                <select 
+                                  className={`inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest outline-none border appearance-none text-center ${
+                                    laudo.status === 'Realizado' ? 'bg-[#e7f9ee] text-[#10b981] border-[#dcfce7]' : 'bg-[#fff7ed] text-[#f59e0b] border-[#ffedd5]'
+                                  }`}
+                                  value={laudo.status}
+                                  onChange={e => updateLaudoInGroup(group.id, laudo.id!, { status: e.target.value as any })}
+                                  disabled={isGuest}
+                                >
+                                  <option value="Realizado">Realizado</option>
+                                  <option value="Pendente">Pendente</option>
+                                  <option value="Em Andamento">Em Andamento</option>
+                                </select>
+                              </td>
+                              <td className="p-4 text-center text-xs font-mono font-black text-slate-600">
+                                <NumericInput 
+                                  className="w-full bg-transparent text-center outline-none"
+                                  value={laudo.realizados}
+                                  onChange={v => updateLaudoInGroup(group.id, laudo.id!, { realizados: v })}
+                                  readOnly={isGuest}
+                                />
+                              </td>
+                              <td className="p-4 text-center text-xs font-mono font-black text-slate-900 pr-12 relative">
+                                <div className="flex items-center justify-center gap-2">
+                                  <NumericInput 
+                                    className="w-full bg-transparent text-center outline-none"
+                                    value={laudo.total}
+                                    onChange={v => updateLaudoInGroup(group.id, laudo.id!, { total: v })}
+                                    readOnly={isGuest}
+                                  />
+                                  {!isGuest && (
+                                    <button 
+                                      onClick={() => askRemoveLaudo(group.id, li)}
+                                      className="absolute right-4 p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover/laudo:opacity-100"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                                </td>
+                              </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  </div>
+                )}
+
+                {/* If unit has disks but NO laudos yet, show a subtle button to add reports module */}
+                {!isGuest && group.disks.length > 0 && (!group.laudos || group.laudos.length === 0) && (
+                  <div className="p-8 flex justify-center border-t border-slate-50 bg-slate-50/30">
+                    <button
+                      onClick={() => addLaudoToGroup(group.id)}
+                      className="flex items-center gap-3 text-slate-400 hover:text-blue-600 transition-all group"
+                    >
+                      <div className="p-2 rounded-xl bg-white border border-slate-200 group-hover:border-blue-200 group-hover:shadow-md transition-all">
+                        <FilePlus className="w-5 h-5" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Habilitar Módulo de Laudos Clínicos</span>
+                    </button>
+                  </div>
+                )}
+            </div>
+          );
+        })}
 
         {!isGuest && (
           <button
@@ -2818,24 +3179,24 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             style={{ 
               position: 'fixed', 
-              left: hoveredComment.x, 
-              top: hoveredComment.y - 120, // Position above
+              left: hoveredComment?.x || 0, 
+              top: (hoveredComment?.y || 0) - 120, // Position above
               zIndex: 9999 
             }}
             className="hidden md:block w-72 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl pointer-events-none"
           >
             <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
               <div className={`w-2 h-2 rounded-full ${
-                hoveredComment.severity === 'sem_prioridade' ? 'bg-slate-400' :
-                hoveredComment.severity === 'baixa' ? 'bg-blue-500' :
-                hoveredComment.severity === 'media' ? 'bg-amber-500' :
-                hoveredComment.severity === 'alta' ? 'bg-orange-500' : 'bg-rose-500'
+                hoveredComment?.severity === 'sem_prioridade' ? 'bg-slate-400' :
+                hoveredComment?.severity === 'baixa' ? 'bg-blue-500' :
+                hoveredComment?.severity === 'media' ? 'bg-amber-500' :
+                hoveredComment?.severity === 'alta' ? 'bg-orange-500' : 'bg-rose-500'
               }`} />
               <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                {hoveredComment.severity.replace('_', ' ')}
+                {hoveredComment?.severity.replace('_', ' ')}
               </span>
             </div>
-            <p className="text-[11px] leading-relaxed font-medium text-slate-200 whitespace-pre-wrap">{hoveredComment.text}</p>
+            <p className="text-[11px] leading-relaxed font-medium text-slate-200 whitespace-pre-wrap">{hoveredComment?.text}</p>
             <div className="absolute top-full left-4 w-3 h-3 bg-slate-900 rotate-45 -mt-1.5" />
           </motion.div>
         )}
@@ -2879,7 +3240,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
               <div className="p-5 md:p-8 overflow-y-auto flex-1 custom-scrollbar">
                 <div className="prose prose-slate max-w-none">
                   <div className="space-y-4">
-                    {aiInsight.split('\n').map((line: string, li: number) => {
+                    {(aiInsight || "").split('\n').map((line: string, li: number) => {
                       let currentLine = line.trim();
                       if (!currentLine) return <div key={li} className="h-2" />;
                       
@@ -3043,7 +3404,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
       {/* Undo Toast */}
       <AnimatePresence>
-        {showUndoToast && lastDeletedDisk && (
+        {showUndoToast && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -3051,12 +3412,21 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
             className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-slate-800 min-w-[320px] md:min-w-[400px]"
           >
             <div className="flex items-center gap-3 flex-1">
-              <div className="p-2 bg-rose-500/20 rounded-lg">
-                <Trash2 className="w-4 h-4 text-rose-400" />
+              <div className="p-2 bg-emerald-500/20 rounded-lg">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
               </div>
               <div>
-                <p className="text-xs font-black uppercase tracking-widest text-white">Disco Excluído</p>
-                <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">{lastDeletedDisk.disk.path || 'Sem caminho'}</p>
+                <p className="text-xs font-black uppercase tracking-widest text-white">
+                  {undoType === 'bulk' ? 'Dados Removidos' : undoType === 'disk' ? 'Disco Excluído' : 'Laudo Excluído'}
+                </p>
+                <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">
+                  {undoType === 'bulk' 
+                    ? `Todos os ${lastBulkDelete?.type === 'disks' ? 'discos' : 'laudos'} da unidade foram limpos`
+                    : undoType === 'disk' 
+                      ? (lastDeletedDisk?.disk.path || 'Sem caminho')
+                      : (lastDeletedLaudo?.laudo.periodo || 'Sem período')
+                  }
+                </p>
               </div>
             </div>
             <button 
@@ -3077,7 +3447,11 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsDeleteConfirmOpen(false)}
+              onClick={() => {
+                setIsDeleteConfirmOpen(false);
+                setDeleteTarget(null);
+                setBulkDeleteTarget(null);
+              }}
               className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
             />
             <motion.div
@@ -3088,22 +3462,36 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
             >
               <div className="p-8 text-center">
                 <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <Trash2 className="w-8 h-8 text-rose-600" />
+                  <AlertCircle className="w-8 h-8 text-rose-600" />
                 </div>
-                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">Excluir Disco?</h2>
+                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">
+                  {bulkDeleteTarget 
+                    ? `Limpar ${bulkDeleteTarget?.type === 'disks' ? 'Discos' : 'Laudos'}?` 
+                    : deleteTarget?.type === 'disk' ? 'Excluir Disco?' : 'Excluir Laudo?'
+                  }
+                </h2>
                 <p className="text-sm text-slate-500 leading-relaxed font-medium">
-                  Esta ação removerá o disco e todas as métricas associadas. Deseja continuar?
+                  {bulkDeleteTarget 
+                    ? `Tem certeza que deseja remover TODOS os ${bulkDeleteTarget?.type === 'disks' ? 'discos' : 'laudos'} desta unidade? Esta ação pode ser desfeita.`
+                    : deleteTarget?.type === 'disk'
+                      ? "Esta ação removerá o disco e todas as métricas associadas. Deseja continuar?"
+                      : "Esta ação removerá o registro do laudo deste período. Deseja continuar?"
+                  }
                 </p>
               </div>
               <div className="p-6 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-3">
                 <button 
-                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  onClick={() => {
+                    setIsDeleteConfirmOpen(false);
+                    setDeleteTarget(null);
+                    setBulkDeleteTarget(null);
+                  }}
                   className="bg-white text-slate-600 px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs border border-slate-200 hover:bg-slate-100 transition-all active:scale-95"
                 >
                   Cancelar
                 </button>
                 <button 
-                  onClick={confirmRemoveDisk}
+                  onClick={bulkDeleteTarget ? confirmBulkDelete : confirmRemoveItem}
                   className="bg-rose-600 text-white px-4 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-all shadow-lg shadow-rose-900/20 active:scale-95"
                 >
                   Sim, Excluir
