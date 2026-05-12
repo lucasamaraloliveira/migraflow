@@ -2899,11 +2899,11 @@ function AIChatDrawer({ isOpen, onClose, migrations, isGuest }: { isOpen: boolea
       {isOpen && (
         <>
           <motion.div
-            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            initial={{ opacity: 0, y: 100, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 40, scale: 0.95 }}
+            exit={{ opacity: 0, y: 100, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed bottom-32 right-8 w-[400px] h-[650px] max-h-[calc(100vh-160px)] bg-slate-900 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] z-50 flex flex-col border border-slate-700/50 rounded-[32px] overflow-hidden text-white ring-1 ring-white/10"
+            className="fixed bottom-0 md:bottom-32 left-0 md:left-auto right-0 md:right-8 w-full md:w-[400px] h-[85vh] md:h-[650px] max-h-[calc(100vh-40px)] md:max-h-[calc(100vh-160px)] bg-slate-900 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] z-[200] flex flex-col border-t md:border border-slate-700/50 rounded-t-[32px] md:rounded-[32px] overflow-hidden text-white ring-1 ring-white/10"
           >
             <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50 backdrop-blur-xl">
               <div className="flex items-center gap-3">
