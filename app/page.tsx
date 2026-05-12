@@ -34,10 +34,12 @@ import {
   Bold,
   Underline,
   Type,
-  FilePlus
+  FilePlus,
+  ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
+import type * as ExcelJS from 'exceljs';
 import { useClients, useMigrations, Disk, DiskGroup, Laudo } from '@/hooks/use-firestore';
 import { format } from 'date-fns';
 // Removed client-side GoogleGenAI import for security
@@ -112,6 +114,19 @@ function NumericInput({ value, onChange, isFloat = false, className, readOnly, p
 // AI initialization removed from client side for security.
 // Calls are now routed through /api/ai
 
+const parseNum = (val: any) => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const s = String(val);
+  // Se contém vírgula, tratamos como formato brasileiro (ex: 1.234,56 ou 5,81)
+  if (s.includes(',')) {
+    const cleanVal = s.replace(/\./g, '').replace(',', '.');
+    return parseFloat(cleanVal) || 0;
+  }
+  // Se não contém vírgula, tratamos como formato padrão JS/US (ex: 1234.56 ou 5.81)
+  return parseFloat(s) || 0;
+};
+
 export default function Home() {
   return (
     <AuthGuard>
@@ -120,9 +135,131 @@ export default function Home() {
   );
 }
 
+function ReportsView({ 
+  migrations, 
+  onGenerateIncidencesReport, 
+  onGenerateHandoffReport,
+  onGenerateExecutiveReport,
+  onGenerateInventoryReport,
+  onGenerateLaudosReport,
+  onGenerateStorageReport,
+  onGenerateDensityReport
+}: { 
+  migrations: any[], 
+  onGenerateIncidencesReport: () => void,
+  onGenerateHandoffReport: () => void,
+  onGenerateExecutiveReport: () => void,
+  onGenerateInventoryReport: () => void,
+  onGenerateLaudosReport: () => void,
+  onGenerateStorageReport: () => void,
+  onGenerateDensityReport: () => void 
+}) {
+  const reports = [
+    {
+      title: "Resumo Executivo Estratégico",
+      desc: "Indicadores macro de progresso global, volumetria total e status das unidades.",
+      icon: BarChart3,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      action: "Exportar XLSX",
+      onClick: onGenerateExecutiveReport
+    },
+    {
+      title: "Inventário de Discos e Storage",
+      desc: "Relatório técnico detalhado por unidade, disco e ponto de montagem.",
+      icon: HardDrive,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+      action: "Exportar XLSX",
+      onClick: onGenerateInventoryReport
+    },
+    {
+      title: "Evolução de Laudos Clínicos",
+      desc: "Acompanhamento de migração de laudos, PDFs e relatórios clínicos.",
+      icon: FileText,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+      action: "Exportar XLSX",
+      onClick: onGenerateLaudosReport
+    },
+    {
+      title: "Relatório de Incidências",
+      desc: "Log detalhado de erros, interrupções e falhas reportadas durante o processo.",
+      icon: AlertCircle,
+      color: "text-red-600",
+      bg: "bg-red-50",
+      action: "Baixar Relatório",
+      onClick: onGenerateIncidencesReport
+    },
+    {
+      title: "Checklist de Entrega (Hand-off)",
+      desc: "Documento de validação de conclusão para unidades com 100% de migração.",
+      icon: CheckCircle2,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+      action: "Gerar Relatório",
+      onClick: onGenerateHandoffReport
+    },
+    {
+      title: "Análise de Densidade e Eficiência",
+      desc: "Estudo de compressão e média de storage por estudo entre diferentes unidades.",
+      icon: Database,
+      color: "text-slate-600",
+      bg: "bg-slate-50",
+      action: "Exportar CSV",
+      onClick: onGenerateDensityReport
+    }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl -mr-32 -mt-32" />
+        <div className="relative z-10 max-w-2xl">
+          <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Centro de Inteligência e Exportação</h3>
+          <p className="text-slate-400 text-sm font-medium leading-relaxed">
+            Selecione um dos modelos de relatório abaixo para extrair informações estruturadas da sua base de migração. 
+            Todos os relatórios são gerados em tempo real com base nos dados mais recentes do MigraFlow.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {reports.map((report, i) => (
+          <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all group flex flex-col h-full">
+            <div className="flex items-start justify-between mb-6">
+              <div className={`p-3 rounded-xl ${report.bg}`}>
+                <report.icon className={`w-6 h-6 ${report.color}`} />
+              </div>
+              <div className="flex gap-1">
+                {[1, 2, 3].map(dot => <div key={dot} className="w-1 h-1 rounded-full bg-slate-200" />)}
+              </div>
+            </div>
+            
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2 group-hover:text-blue-600 transition-colors">
+              {report.title}
+            </h4>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed mb-6 flex-1">
+              {report.desc}
+            </p>
+            
+            <button 
+              onClick={report.onClick}
+              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border border-slate-100 hover:border-slate-900 flex items-center justify-center gap-2 shadow-sm"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+              {report.action}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DashboardContent() {
   const { user, isGuest, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'migrations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'migrations' | 'reports'>('overview');
   const { clients, addClient, deleteClient, updateClient } = useClients();
   const { migrations, addMigration, updateMigration, deleteMigration } = useMigrations();
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -234,7 +371,7 @@ function DashboardContent() {
     const laudoHeaders = [
       ['Período', 'Status', 'Realizados', 'Total'],
       ['Novembro - 2024', 'Realizado', '3429', '3429'],
-      ['Outubro - 2024', 'Realizado', '4702', '4702']
+      ['Outubro - 2024', 'Outro', '4702', '4702']
     ];
     const wsLaudos = XLSX.utils.aoa_to_sheet(laudoHeaders);
     wsLaudos['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
@@ -242,6 +379,923 @@ function DashboardContent() {
 
     XLSX.writeFile(wb, "migraflow_modelos_importacao.xlsx");
   };
+
+  const getAllDisks = (m: any) => {
+    if (m.groups && m.groups.length > 0) {
+      return m.groups.flatMap((g: any) => g.disks || []);
+    }
+    return m.disks || [];
+  };
+
+  const generateIncidencesReport = async () => {
+    if (typeof window !== 'undefined' && !window.Buffer) {
+      const { Buffer } = await import('buffer');
+      window.Buffer = Buffer;
+    }
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Log de Incidências');
+
+    sheet.mergeCells('A1:D2');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'MIGRAFLOW | RELATÓRIO DE INCIDÊNCIAS TÉCNICAS';
+    titleCell.style = { font: { bold: true, size: 14, color: { argb: 'FFE11D48' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+
+    const headers = ['CLIENTE', 'DATA', 'SEVERIDADE', 'DESCRIÇÃO DA INCIDÊNCIA'];
+    const headerRow = sheet.getRow(5);
+    headerRow.height = 25;
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBE123C' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+    });
+
+    let currentRow = 6;
+    const allComments: any[] = [];
+    clients.forEach(c => {
+      (c.comments || []).forEach((com: any) => {
+        allComments.push({ client: c.name, ...com });
+        const row = sheet.getRow(currentRow);
+        row.getCell(1).value = c.name;
+        row.getCell(2).value = com.date;
+        row.getCell(3).value = com.severity?.toUpperCase() || 'NORMAL';
+        row.getCell(4).value = com.text;
+        
+        row.eachCell((cell, i) => {
+          cell.border = { bottom: { style: 'thin', color: { argb: 'FFFFE4E6' } } };
+          cell.alignment = { vertical: 'middle', horizontal: i < 4 ? 'center' : 'left' };
+          if (currentRow % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } };
+        });
+        currentRow++;
+      });
+    });
+
+    const severitySummary = [
+      { label: 'Alta', value: allComments.filter(c => c.severity === 'alta').length, color: '#e11d48' },
+      { label: 'Média', value: allComments.filter(c => c.severity === 'media').length, color: '#f59e0b' },
+      { label: 'Baixa', value: allComments.filter(c => c.severity === 'baixa').length, color: '#3b82f6' }
+    ].filter(s => s.value > 0);
+
+    if (severitySummary.length > 0) {
+      const chartImg = await generateChartImage('pie', severitySummary, 'Distribuição por Severidade');
+      const chartId = workbook.addImage({ base64: chartImg as string, extension: 'png' });
+      sheet.addImage(chartId, { tl: { col: 5, row: 4 }, ext: { width: 400, height: 300 } });
+    }
+
+    sheet.getColumn(1).width = 25;
+    sheet.getColumn(2).width = 15;
+    sheet.getColumn(3).width = 15;
+    sheet.getColumn(4).width = 60;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `MigraFlow_Log_Incidencias_${new Date().toISOString().split('T')[0]}.xlsx`;
+    anchor.click();
+  };
+
+  const generateLaudosReport = async () => {
+    if (typeof window !== 'undefined' && !window.Buffer) {
+      const { Buffer } = await import('buffer');
+      window.Buffer = Buffer;
+    }
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Laudos Resumo');
+
+    sheet.mergeCells('A1:D2');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'MIGRAFLOW | RELATÓRIO GLOBAL DE LAUDOS';
+    titleCell.style = { font: { bold: true, size: 14, color: { argb: 'FFB45309' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+
+    const headers = ['CLIENTE', 'TOTAL LAUDOS', 'REALIZADOS', 'PENDENTES'];
+    const headerRow = sheet.getRow(5);
+    headerRow.height = 25;
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD97706' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+    });
+
+    let currentRow = 6;
+    migrations.forEach(m => {
+      const allLaudos = m.groups?.flatMap((g: any) => g.laudos || []) || [];
+      const done = allLaudos.filter((l: any) => l.status === 'Concluído' || l.status === 'Realizado').length;
+      
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = getClientName(m);
+      row.getCell(2).value = allLaudos.length;
+      row.getCell(3).value = done;
+      row.getCell(4).value = allLaudos.length - done;
+      
+      row.eachCell(cell => {
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFFDE68A' } } };
+        cell.alignment = { horizontal: 'center' };
+      });
+      currentRow++;
+    });
+
+    sheet.addImage(sheet.workbook.addImage({ base64: await generateChartImage('bar', [{label:'Total', value:10, color:'#b45309'}], 'Resumo Geral') || '', extension: 'png' }), { tl: { col: 5, row: 4 }, ext: { width: 300, height: 200 } });
+
+    // --- SEPARAÇÃO POR CLIENTE ---
+    for (const m of migrations) {
+      const clientName = getClientName(m);
+      const safeName = clientName.substring(0, 31).replace(/[:\\\/\?\*\[\]]/g, '');
+      const clientSheet = workbook.addWorksheet(`${safeName}_Lau`);
+
+      clientSheet.mergeCells('A1:G2');
+      const cTitle = clientSheet.getCell('A1');
+      cTitle.value = `LAUDOS E RELATÓRIOS: ${clientName.toUpperCase()}`;
+      cTitle.style = { font: { bold: true, size: 12, color: { argb: 'FFB45309' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+
+      const allLaudos = m.groups?.flatMap((g: any) => g.laudos || []) || [];
+      const tableHeaders = ['UNIDADE', 'PERÍODO', 'STATUS', 'REALIZADOS', 'TOTAL', '% PROGRESSO'];
+      const hRow = clientSheet.getRow(4);
+      tableHeaders.forEach((h, i) => {
+        const cell = hRow.getCell(i + 1);
+        cell.value = h;
+        cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92400E' } }, alignment: { horizontal: 'center' } };
+      });
+
+      allLaudos.forEach((l: any, idx) => {
+        const r = clientSheet.getRow(5 + idx);
+        const prog = Number(l.total) > 0 ? Math.min(1, Number(l.realizados) / Number(l.total)) : 0;
+        r.getCell(1).value = m.groups?.find((g: any) => g.laudos?.includes(l))?.title || 'Unidade';
+        r.getCell(2).value = l.periodo;
+        r.getCell(3).value = l.status;
+        r.getCell(4).value = Number(l.realizados) || 0;
+        r.getCell(5).value = Number(l.total) || 0;
+        r.getCell(6).value = prog;
+        r.getCell(6).numFmt = '0.0%';
+        
+        r.eachCell(cell => { cell.border = { bottom: { style: 'thin', color: { argb: 'FFFDE68A' } } }; });
+      });
+
+      const cProgData = [
+        { label: 'Entregue', value: allLaudos.filter(l => l.status === 'Concluído' || l.status === 'Realizado').length, color: '#10b981' },
+        { label: 'Pendente', value: allLaudos.filter(l => l.status !== 'Concluído' && l.status !== 'Realizado').length, color: '#f59e0b' }
+      ].filter(p => p.value > 0);
+
+      if (cProgData.length > 0) {
+        const chartImg = await generateChartImage('pie', cProgData, 'Status de Entrega');
+        const chartId = workbook.addImage({ base64: chartImg as string, extension: 'png' });
+        clientSheet.addImage(chartId, { tl: { col: 6, row: 4 }, ext: { width: 300, height: 250 } });
+      }
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `MigraFlow_Laudos_Clinicos_${new Date().toISOString().split('T')[0]}.xlsx`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const generateHandoffReport = async () => {
+    if (typeof window !== 'undefined' && !window.Buffer) {
+      const { Buffer } = await import('buffer');
+      window.Buffer = Buffer;
+    }
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Hand-off Checklist');
+
+    sheet.mergeCells('A1:F2');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'MIGRAFLOW | CHECKLIST DE ENTREGA E HAND-OFF';
+    titleCell.style = { font: { bold: true, size: 14, color: { argb: 'FF4F46E5' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+
+    const headers = ['CLIENTE', 'STATUS', 'PROGRESSO', 'DURAÇÃO ESTIMADA', 'VOLUMETRIA TOTAL', 'VALIDAÇÃO'];
+    const headerRow = sheet.getRow(5);
+    headerRow.height = 25;
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4338CA' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+    });
+
+    const readyMigrations = migrations.filter(m => {
+      const disks = getAllDisks(m);
+      const total = disks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0);
+      const realized = disks.reduce((acc: number, d: any) => acc + (Number(d.pastasRealizadas) || 0), 0);
+      return total > 0 && realized >= total * 0.99; // 99% or more
+    });
+
+    let currentRow = 6;
+    readyMigrations.forEach(m => {
+      const disks = getAllDisks(m);
+      const vol = disks.reduce((acc: number, d: any) => acc + parseNum(d.storageMapeado), 0);
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = getClientName(m);
+      row.getCell(2).value = m.status.toUpperCase();
+      row.getCell(3).value = 1;
+      row.getCell(3).numFmt = '0%';
+      row.getCell(4).value = 'CONCLUÍDO';
+      row.getCell(5).value = vol;
+      row.getCell(5).numFmt = '#,##0.00 "TB"';
+      row.getCell(6).value = 'AGUARDANDO ASSINATURA';
+      
+      row.eachCell(cell => {
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE0E7FF' } } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+      currentRow++;
+    });
+
+    sheet.getColumn(1).width = 30;
+    sheet.getColumn(2).width = 15;
+    sheet.getColumn(3).width = 12;
+    sheet.getColumn(4).width = 20;
+    sheet.getColumn(5).width = 20;
+    sheet.getColumn(6).width = 25;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `MigraFlow_Handoff_Checklist_${new Date().toISOString().split('T')[0]}.xlsx`;
+    anchor.click();
+  };
+
+  const generateDensityReport = async () => {
+    if (typeof window !== 'undefined' && !window.Buffer) {
+      const { Buffer } = await import('buffer');
+      window.Buffer = Buffer;
+    }
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Densidade e Eficiência');
+
+    // Header Branding
+    sheet.mergeCells('A1:F2');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'MIGRAFLOW | ANÁLISE DE DENSIDADE E EFICIÊNCIA OPERACIONAL';
+    titleCell.style = { 
+      font: { bold: true, size: 14, color: { argb: 'FF1E293B' } }, 
+      alignment: { horizontal: 'center', vertical: 'middle' } 
+    };
+
+    // Table Headers
+    const headers = ["CLIENTE", "TOTAL ESTUDOS", "STORAGE (TB)", "MÉDIA GB/ESTUDO", "DENSIDADE (MB)", "EFICIÊNCIA"];
+    const headerRow = sheet.getRow(5);
+    headerRow.height = 25;
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.style = { 
+        font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 }, 
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } }, 
+        alignment: { horizontal: 'center', vertical: 'middle' } 
+      };
+    });
+
+    let currentRow = 6;
+    migrations.forEach((m: any) => {
+      const disks = getAllDisks(m);
+      const studies = disks.reduce((sum: number, d: any) => sum + (Number(d.estudos) || 0), 0);
+      const volTB = disks.reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0);
+      const avgGB = studies > 0 ? (volTB * 1024) / studies : 0;
+      const avgMB = avgGB * 1024;
+      
+      let efficiency = "N/A";
+      let effColor = "FF94A3B8";
+      if (avgGB > 0) {
+        if (avgGB < 0.5) { efficiency = "ALTA (OTIMIZADO)"; effColor = "FF059669"; }
+        else if (avgGB < 1.5) { efficiency = "NORMAL"; effColor = "FF2563EB"; }
+        else { efficiency = "BAIXA (DADOS DENSOS)"; effColor = "FFDC2626"; }
+      }
+
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = getClientName(m);
+      row.getCell(2).value = studies;
+      row.getCell(3).value = volTB;
+      row.getCell(4).value = avgGB;
+      row.getCell(5).value = avgMB;
+      row.getCell(6).value = efficiency;
+
+      // Formatting
+      row.getCell(2).numFmt = '#,##0';
+      row.getCell(3).numFmt = '#,##0.00 "TB"';
+      row.getCell(4).numFmt = '#,##0.00 "GB"';
+      row.getCell(5).numFmt = '#,##0 "MB"';
+
+      row.eachCell((cell, colNumber) => {
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
+        cell.alignment = { vertical: 'middle', horizontal: colNumber > 1 ? 'center' : 'left' };
+        if (colNumber === 6) {
+          cell.font = { bold: true, color: { argb: effColor }, size: 8 };
+        }
+      });
+      currentRow++;
+    });
+
+    // Charts
+    const densityData = migrations.slice(0, 8).map((m: any) => {
+      const disks = getAllDisks(m);
+      const studies = disks.reduce((sum: number, d: any) => sum + (Number(d.estudos) || 0), 0);
+      const volTB = disks.reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0);
+      return { 
+        label: getClientName(m), 
+        value: studies > 0 ? (volTB * 1024) / studies : 0,
+        color: '#6366f1'
+      };
+    }).filter((d: any) => d.value > 0);
+
+    if (densityData.length > 0) {
+      const chartImg = await generateChartImage('bar', densityData, 'Média de Storage por Estudo (GB)');
+      const chartId = workbook.addImage({ base64: chartImg as string, extension: 'png' });
+      sheet.addImage(chartId, { tl: { col: 6, row: 4 }, ext: { width: 500, height: 350 } });
+    }
+
+    sheet.getColumn(1).width = 25;
+    sheet.getColumn(4).width = 15;
+    sheet.getColumn(5).width = 15;
+    sheet.getColumn(6).width = 25;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `MigraFlow_Analise_Densidade_${new Date().toISOString().split('T')[0]}.xlsx`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const generateGlobalStorageReport = () => {
+    const wb = XLSX.utils.book_new();
+
+    // 1. Overview Sheet
+    const overviewData = migrations.map((m: any) => {
+      const allDisks = getAllDisks(m);
+      const totalTB = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageMapeado), 0);
+      const sentTB = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageEnviado), 0);
+      const totalPastas = allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0);
+      const realizedPastas = allDisks.reduce((acc: number, d: any) => acc + (Number(d.pastasRealizadas) || 0), 0);
+      const progress = totalPastas > 0 ? ((realizedPastas / totalPastas) * 100).toFixed(2) : "0.00";
+
+      return {
+        'Cliente': getClientName(m),
+        'Status': m.status.toUpperCase(),
+        'Progresso (%)': progress + "%",
+        'Storage Mapeado (TB)': totalTB.toFixed(2),
+        'Storage Enviado (TB)': sentTB.toFixed(2),
+        'Total Pastas': totalPastas,
+        'Pastas Realizadas': realizedPastas
+      };
+    });
+    const wsOverview = XLSX.utils.json_to_sheet(overviewData);
+    XLSX.utils.book_append_sheet(wb, wsOverview, "Visão Geral");
+
+    // 2. Disks Sheet
+    const disksData: any[] = [];
+    migrations.forEach((m: any) => {
+      const clientName = getClientName(m);
+      const allDisks = getAllDisks(m);
+      allDisks.forEach((d: any) => {
+        disksData.push({
+          'Cliente': clientName,
+          'Caminho': d.path,
+          'Destino': d.destination || '-',
+          'Status': d.status,
+          'Mapeado (TB)': parseNum(d.storageMapeado).toFixed(2),
+          'Enviado (TB)': parseNum(d.storageEnviado).toFixed(2),
+          'Pastas': `${d.pastasRealizadas}/${d.totalPastas}`,
+          'Estudos': d.estudos || 0
+        });
+      });
+    });
+    const wsDisks = XLSX.utils.json_to_sheet(disksData);
+    XLSX.utils.book_append_sheet(wb, wsDisks, "Inventário de Discos");
+
+    // 3. Laudos Sheet
+    const laudosData: any[] = [];
+    migrations.forEach(m => {
+      const clientName = getClientName(m);
+      const allLaudos = m.groups?.flatMap((g: any) => g.laudos || []) || [];
+      allLaudos.forEach((l: any) => {
+        laudosData.push({
+          'Cliente': clientName,
+          'Período': l.periodo,
+          'Status': l.status,
+          'Realizados': l.realizados,
+          'Total': l.total
+        });
+      });
+    });
+    if (laudosData.length > 0) {
+      const wsLaudos = XLSX.utils.json_to_sheet(laudosData);
+      XLSX.utils.book_append_sheet(wb, wsLaudos, "Laudos Clínicos");
+    }
+
+    XLSX.writeFile(wb, `MigraFlow_Relatorio_Global_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const generateChartImage = (type: 'pie' | 'bar', data: { label: string, value: number, color: string }[], title: string) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Title
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(title.toUpperCase(), canvas.width / 2, 45);
+
+    if (type === 'pie') {
+      const total = data.reduce((acc, d) => acc + d.value, 0);
+      let startAngle = 0;
+      const centerX = 200;
+      const centerY = 220;
+      const radius = 120;
+
+      data.forEach((d, i) => {
+        if (d.value === 0 && total > 0) return;
+        const sliceAngle = total > 0 ? (2 * Math.PI * d.value) / total : (2 * Math.PI) / (data.length || 1);
+        
+        ctx.fillStyle = d.color;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+        ctx.closePath();
+        ctx.fill();
+
+        // Legend
+        const legendX = 380;
+        const legendY = 100 + i * 30;
+        ctx.fillRect(legendX, legendY, 18, 18);
+        ctx.fillStyle = '#475569';
+        ctx.font = '13px sans-serif';
+        ctx.textAlign = 'left';
+        const percent = total > 0 ? ((d.value/total)*100).toFixed(1) : '0';
+        ctx.fillText(`${d.label}: ${d.value.toFixed(1)} (${percent}%)`, legendX + 25, legendY + 14);
+
+        startAngle += sliceAngle;
+      });
+    } else {
+      // Bar Chart
+      const maxVal = Math.max(...data.map(d => d.value), 1);
+      const barWidth = 35;
+      const spacing = 65;
+      const startX = 80;
+      const startY = 320;
+      const chartHeight = 220;
+
+      // Draw Axes
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(startX - 10, startY);
+      ctx.lineTo(startX + data.length * spacing, startY);
+      ctx.stroke();
+
+      data.forEach((d, i) => {
+        const h = (d.value / maxVal) * chartHeight;
+        ctx.fillStyle = d.color;
+        ctx.fillRect(startX + i * spacing, startY - h, barWidth, h);
+
+        // Labels
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px sans-serif';
+        ctx.save();
+        ctx.translate(startX + i * spacing + barWidth / 2, startY + 15);
+        ctx.rotate(Math.PI / 6);
+        ctx.textAlign = 'left';
+        ctx.fillText(d.label.length > 15 ? d.label.substring(0, 15) + '...' : d.label, 0, 0);
+        ctx.restore();
+
+        // Value
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(d.value.toFixed(1), startX + i * spacing + barWidth / 2, startY - h - 8);
+      });
+    }
+
+    return canvas.toDataURL('image/png').split(',')[1]; // Base64 without header
+  };
+
+  const generateExecutiveReport = async () => {
+    // Polyfill Buffer for browser environment if needed by ExcelJS
+    if (typeof window !== 'undefined' && !window.Buffer) {
+      const { Buffer } = await import('buffer');
+      window.Buffer = Buffer;
+    }
+
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Resumo Executivo');
+
+    const getAllDisks = (m: any) => {
+      if (m.groups && m.groups.length > 0) {
+        return m.groups.flatMap((g: any) => g.disks || []);
+      }
+      return m.disks || [];
+    };
+
+    const totalMapeado = migrations.reduce((acc: number, m: any) => 
+      acc + getAllDisks(m).reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0), 0);
+    
+    const totalEnviado = migrations.reduce((acc: number, m: any) => 
+      acc + getAllDisks(m).reduce((sum: number, d: any) => sum + parseNum(d.storageEnviado), 0), 0);
+    
+    const totalPastas = migrations.reduce((acc: number, m: any) => 
+      acc + getAllDisks(m).reduce((sum: number, d: any) => sum + (Number(d.totalPastas) || 0), 0), 0);
+      
+    const realizedPastas = migrations.reduce((acc: number, m: any) => 
+      acc + getAllDisks(m).reduce((sum: number, d: any) => sum + (Number(d.pastasRealizadas) || 0), 0), 0);
+
+    const progressGlobal = totalPastas > 0 ? Math.min(1, realizedPastas / totalPastas) : 0;
+
+    const headerStyle: Partial<ExcelJS.Style> = {
+      font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+      border: { 
+        bottom: { style: 'thin', color: { argb: 'FF334155' } },
+        top: { style: 'thin', color: { argb: 'FF334155' } },
+        left: { style: 'thin', color: { argb: 'FF334155' } },
+        right: { style: 'thin', color: { argb: 'FF334155' } }
+      }
+    };
+
+    sheet.mergeCells('A1:G2');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'MIGRAFLOW | DASHBOARD EXECUTIVO DE MIGRAÇÃO';
+    titleCell.style = {
+      font: { bold: true, size: 14, color: { argb: 'FF2563EB' } },
+      alignment: { horizontal: 'center', vertical: 'middle' }
+    };
+
+    sheet.mergeCells('A3:G3');
+    sheet.getCell('A3').value = `Relatório Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
+    sheet.getCell('A3').style = { font: { italic: true, size: 9, color: { argb: 'FF64748B' } }, alignment: { horizontal: 'center' } };
+
+    const cards = [
+      { label: 'PROGRESSO GLOBAL', value: progressGlobal, format: '0.0%', color: 'FF2563EB' },
+      { label: 'VOLUME MAPEADO', value: totalMapeado, format: '#,##0.00 "TB"', color: 'FF1E293B' },
+      { label: 'VOLUME ENVIADO', value: totalEnviado, format: '#,##0.00 "TB"', color: 'FF10B981' },
+      { label: 'UNIDADES ATIVAS', value: migrations.length, format: '0', color: 'FF6366F1' }
+    ];
+
+    const cardCols = [1, 3, 5, 7];
+    cards.forEach((card, i) => {
+      const colIdx = cardCols[i];
+      const cellLabel = sheet.getCell(5, colIdx);
+      const cellValue = sheet.getCell(6, colIdx);
+      cellLabel.value = card.label;
+      cellLabel.style = { font: { bold: true, size: 8, color: { argb: 'FF94A3B8' } }, alignment: { horizontal: 'center' }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } } };
+      cellValue.value = card.value;
+      cellValue.style = { 
+        font: { bold: true, size: 12, color: { argb: card.color } }, 
+        alignment: { horizontal: 'center' }, 
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } },
+        numFmt: card.format
+      };
+      const borderStyle: Partial<ExcelJS.Border> = { style: 'thin', color: { argb: 'FFE2E8F0' } };
+      cellLabel.border = { top: borderStyle, left: borderStyle, right: borderStyle };
+      cellValue.border = { bottom: borderStyle, left: borderStyle, right: borderStyle };
+    });
+
+    const tableHeader = ['CLIENTE / UNIDADE', 'STATUS ATUAL', 'PROGRESSO', 'MAPEADO (TB)', 'ENVIADO (TB)', 'ESTUDOS', 'PREVISÃO'];
+    const row8 = sheet.getRow(8);
+    row8.height = 25;
+    tableHeader.forEach((h, i) => {
+      const cell = row8.getCell(i + 1);
+      cell.value = h;
+      cell.style = headerStyle;
+    });
+
+    migrations.forEach((m, i) => {
+      const rowIndex = 9 + i;
+      const allDisks = getAllDisks(m);
+      const mVol = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageMapeado), 0);
+      const mSent = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageEnviado), 0);
+      const mTotal = allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0);
+      const mReal = allDisks.reduce((acc: number, d: any) => acc + (Number(d.pastasRealizadas) || 0), 0);
+      const mProgress = mTotal > 0 ? Math.min(1, mReal / mTotal) : 0;
+      const mStudies = allDisks.reduce((acc: number, d: any) => acc + (Number(d.estudos) || 0), 0);
+
+      const row = sheet.getRow(rowIndex);
+      row.height = 20;
+      row.getCell(1).value = getClientName(m);
+      row.getCell(2).value = m.status.toUpperCase();
+      row.getCell(3).value = mProgress;
+      row.getCell(3).numFmt = '0.0%';
+      row.getCell(4).value = mVol;
+      row.getCell(4).numFmt = '#,##0.00';
+      row.getCell(5).value = mSent;
+      row.getCell(5).numFmt = '#,##0.00';
+      row.getCell(6).value = mStudies;
+      row.getCell(6).numFmt = '#,##0';
+      row.getCell(7).value = m.endDate || '-';
+
+      row.eachCell((cell, colNumber) => {
+        cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'left' : 'center' };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFF1F5F9' } }, left: { style: 'thin', color: { argb: 'FFF1F5F9' } }, right: { style: 'thin', color: { argb: 'FFF1F5F9' } } };
+        if (i % 2 !== 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      });
+
+      const progressCell = row.getCell(3);
+      if (mProgress >= 0.99) progressCell.font = { color: { argb: 'FF059669' }, bold: true, size: 9 };
+      else if (mProgress > 0) progressCell.font = { color: { argb: 'FF2563EB' }, bold: true, size: 9 };
+    });
+
+    // 7. Graphics: Conditional Formatting (Data Bars)
+    if (migrations.length > 0) {
+      sheet.addConditionalFormatting({
+        ref: `C9:C${8 + migrations.length}`,
+        rules: [
+          {
+            type: 'dataBar',
+            cfvo: [{ type: 'min', value: 0 }, { type: 'max', value: 1 }],
+            color: { argb: 'FFDBEAFE' }
+          } as any
+        ]
+      });
+    }
+
+    // 8. Charts: Visual Graphics
+    const statusSummary = [
+      { label: 'Concluída', value: migrations.filter(m => m.status === 'concluida').length, color: '#10b981' },
+      { label: 'Em Execução', value: migrations.filter(m => m.status === 'em_progresso').length, color: '#2563eb' },
+      { label: 'Pendente', value: migrations.filter(m => m.status === 'pendente').length, color: '#94a3b8' },
+      { label: 'Atrasada', value: migrations.filter(m => m.status === 'atrasada').length, color: '#f43f5e' }
+    ];
+
+    const volumeByClient = migrations.slice(0, 8).map(m => {
+      const allDisks = getAllDisks(m);
+      return { 
+        label: getClientName(m), 
+        value: allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageMapeado), 0),
+        color: '#6366f1'
+      };
+    });
+
+    const statusChartBase64 = generateChartImage('pie', statusSummary, 'Distribuição por Status');
+    const volumeChartBase64 = generateChartImage('bar', volumeByClient, 'Volume por Cliente (TB)');
+
+    if (statusChartBase64) {
+      const statusImg = workbook.addImage({ base64: statusChartBase64, extension: 'png' });
+      sheet.addImage(statusImg, { tl: { col: 8, row: 4 }, ext: { width: 380, height: 240 } });
+    }
+
+    if (volumeChartBase64) {
+      const volumeImg = workbook.addImage({ base64: volumeChartBase64, extension: 'png' });
+      sheet.addImage(volumeImg, { tl: { col: 8, row: 17 }, ext: { width: 380, height: 240 } });
+    }
+
+    // --- SEPARAÇÃO POR CLIENTE ---
+    for (const m of migrations) {
+      const clientName = getClientName(m);
+      const safeName = clientName.substring(0, 31).replace(/[:\\\/\?\*\[\]]/g, '');
+      const clientSheet = workbook.addWorksheet(safeName);
+
+      clientSheet.mergeCells('A1:G2');
+      const cTitle = clientSheet.getCell('A1');
+      cTitle.value = `RESUMO INDIVIDUAL: ${clientName.toUpperCase()}`;
+      cTitle.style = { font: { bold: true, size: 12, color: { argb: 'FF2563EB' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+
+      const allDisks = getAllDisks(m);
+      const cTotal = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageMapeado), 0);
+      const cSent = allDisks.reduce((acc: number, d: any) => acc + parseNum(d.storageEnviado), 0);
+      const cProg = allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0) > 0 
+        ? Math.min(1, allDisks.reduce((acc: number, d: any) => acc + (Number(d.pastasRealizadas) || 0), 0) / allDisks.reduce((acc: number, d: any) => acc + (Number(d.totalPastas) || 0), 0))
+        : 0;
+
+      const cCards = [
+        { l: 'STATUS', v: m.status.toUpperCase(), c: 'FF1E293B' },
+        { l: 'PROGRESSO', v: cProg, f: '0.0%', c: 'FF2563EB' },
+        { l: 'MAPEADO', v: cTotal, f: '#,##0.00 "TB"', c: 'FF1E293B' },
+        { l: 'ENVIADO', v: cSent, f: '#,##0.00 "TB"', c: 'FF10B981' }
+      ];
+
+      cCards.forEach((card, i) => {
+        const col = i * 2 + 1;
+        clientSheet.getCell(4, col).value = card.l;
+        clientSheet.getCell(4, col).style = { font: { bold: true, size: 8, color: { argb: 'FF94A3B8' } }, alignment: { horizontal: 'center' } };
+        const vCell = clientSheet.getCell(5, col);
+        vCell.value = card.v;
+        vCell.style = { font: { bold: true, size: 11, color: { argb: card.c } }, alignment: { horizontal: 'center' }, numFmt: card.f };
+      });
+
+      const cStatusData = [
+        { label: 'Concluído', value: allDisks.filter((d: any) => d.status === 'Realizado').length, color: '#10b981' },
+        { label: 'Em Execução', value: allDisks.filter((d: any) => d.status !== 'Realizado').length, color: '#2563eb' }
+      ].filter((d: any) => d.value > 0);
+
+      if (cStatusData.length > 0) {
+        const cPieImg = await generateChartImage('pie', cStatusData, 'Distribuição de Discos');
+        const cPieId = workbook.addImage({ base64: cPieImg as string, extension: 'png' });
+        clientSheet.addImage(cPieId, { tl: { col: 0, row: 7 }, ext: { width: 300, height: 250 } });
+      }
+
+      const cDiskData = allDisks.slice(0, 6).map((d: any) => ({ label: d.path.split('\\').pop() || d.path, value: parseNum(d.storageMapeado) }));
+      if (cDiskData.length > 0) {
+        const cBarImg = await generateChartImage('bar', cDiskData, 'Volumetria por Disco (TB)');
+        const cBarId = workbook.addImage({ base64: cBarImg as string, extension: 'png' });
+        clientSheet.addImage(cBarId, { tl: { col: 4, row: 7 }, ext: { width: 400, height: 250 } });
+      }
+    }
+
+    // 10. Write and Download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `MigraFlow_Resumo_Executivo_${new Date().toISOString().split('T')[0]}.xlsx`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const generateInventoryReport = async () => {
+    if (typeof window !== 'undefined' && !window.Buffer) {
+      const { Buffer } = await import('buffer');
+      window.Buffer = Buffer;
+    }
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Inventário de Discos');
+
+    // Branding Header
+    sheet.mergeCells('A1:J2');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'MIGRAFLOW | INVENTÁRIO TÉCNICO DE DISCOS E STORAGE';
+    titleCell.style = { font: { bold: true, size: 14, color: { argb: 'FF059669' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+
+    // KPI Summary
+    const totalDisks = migrations.reduce((acc: number, m: any) => acc + (m.disks?.length || 0) + (m.groups?.reduce((s: number, g: any) => s + (g.disks?.length || 0), 0) || 0), 0);
+    const totalMapeado = migrations.reduce((acc: number, m: any) => 
+      acc + [...(m.disks || []), ...(m.groups?.flatMap((g: any) => g.disks || []) || [])]
+      .reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0), 0);
+
+    const fmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    sheet.mergeCells('A4:C5');
+    sheet.getCell('A4').value = `Total de Discos: ${totalDisks} | Volumetria Global: ${fmt.format(totalMapeado)} TB`;
+    sheet.getCell('A4').style = { 
+      font: { bold: true, size: 10 }, 
+      alignment: { horizontal: 'center', vertical: 'middle' }, 
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }, 
+      border: { 
+        top: { style: 'thin', color: { argb: 'FFD1FAE5' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1FAE5' } },
+        left: { style: 'thin', color: { argb: 'FFD1FAE5' } },
+        right: { style: 'thin', color: { argb: 'FFD1FAE5' } }
+      } 
+    };
+
+    // Header Table
+    const headers = ['CLIENTE', 'UNIDADE', 'CAMINHO / HOST', 'STATUS', 'PASTAS MIGRADAS', 'TOTAL PASTAS', '% PROGRESSO', 'MAPEADO (TB)', 'ENVIADO (TB)', 'ESTUDOS'];
+    const headerRow = sheet.getRow(7);
+    headerRow.height = 25;
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+    });
+
+    const getAllDisks = (m: any) => {
+      if (m.groups && m.groups.length > 0) {
+        return m.groups.flatMap((g: any) => g.disks || []);
+      }
+      return m.disks || [];
+    };
+
+    let currentRow = 8;
+    migrations.forEach((m, mIdx) => {
+      const disks = getAllDisks(m);
+      disks.forEach((d: any, dIdx: number) => {
+        const row = sheet.getRow(currentRow);
+        row.height = 20;
+        const progress = Number(d.totalPastas) > 0 ? Math.min(1, Number(d.pastasRealizadas) / Number(d.totalPastas)) : 0;
+        
+        row.getCell(1).value = getClientName(m);
+        row.getCell(2).value = m.groups?.find((g: any) => g.disks?.includes(d))?.title || 'Unidade Principal';
+        row.getCell(3).value = d.path;
+        row.getCell(4).value = d.status;
+        row.getCell(5).value = Number(d.pastasRealizadas) || 0;
+        row.getCell(5).numFmt = '#,##0';
+        row.getCell(6).value = Number(d.totalPastas) || 0;
+        row.getCell(6).numFmt = '#,##0';
+        row.getCell(7).value = progress;
+        row.getCell(7).numFmt = '0.0%';
+        row.getCell(8).value = parseNum(d.storageMapeado);
+        row.getCell(8).numFmt = '#,##0.00';
+        row.getCell(9).value = parseNum(d.storageEnviado);
+        row.getCell(9).numFmt = '#,##0.00';
+        row.getCell(10).value = Number(d.estudos) || 0;
+        row.getCell(10).numFmt = '#,##0';
+
+        row.eachCell((cell, colNumber) => {
+          cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }, left: { style: 'thin', color: { argb: 'FFF1F5F9' } }, right: { style: 'thin', color: { argb: 'FFF1F5F9' } } };
+          cell.alignment = { vertical: 'middle', horizontal: colNumber > 4 ? 'center' : 'left' };
+          if (currentRow % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+        });
+        currentRow++;
+      });
+    });
+
+    if (currentRow > 8) {
+      sheet.addConditionalFormatting({
+        ref: `G8:G${currentRow - 1}`,
+        rules: [{ type: 'dataBar', cfvo: [{ type: 'min', value: 0 }, { type: 'max', value: 1 }], color: { argb: 'FFD1FAE5' } } as any]
+      });
+    }
+
+    // 8. Charts: Technical Visuals
+    const diskStatusSummary = [
+      { label: 'Realizado', value: migrations.reduce((acc, m) => acc + [...(m.disks || []), ...(m.groups?.flatMap((g: any) => g.disks || []) || [])].filter(d => d.status === 'Realizado').length, 0), color: '#10b981' },
+      { label: 'Pendente', value: migrations.reduce((acc, m) => acc + [...(m.disks || []), ...(m.groups?.flatMap((g: any) => g.disks || []) || [])].filter(d => d.status === 'Pendente').length, 0), color: '#94a3b8' }
+    ];
+
+    const chartBase64 = generateChartImage('pie', diskStatusSummary, 'Saúde Global dos Discos');
+    if (chartBase64) {
+      const imgId = workbook.addImage({ base64: chartBase64, extension: 'png' });
+      sheet.addImage(imgId, { tl: { col: 11, row: 4 }, ext: { width: 400, height: 280 } });
+    }
+
+    sheet.getColumn(1).width = 25;
+    sheet.getColumn(2).width = 20;
+    sheet.getColumn(3).width = 45;
+    sheet.getColumn(4).width = 15;
+    sheet.getColumn(7).width = 15;
+    sheet.getColumn(8).width = 15;
+    sheet.getColumn(9).width = 15;
+    sheet.getColumn(10).width = 12;
+    sheet.getColumn(11).width = 5; // Spacing
+
+    // --- SEPARAÇÃO POR CLIENTE ---
+    for (const m of migrations) {
+      const clientName = getClientName(m);
+      const safeName = clientName.substring(0, 31).replace(/[:\\\/\?\*\[\]]/g, '');
+      const clientSheet = workbook.addWorksheet(`${safeName}_Inv`);
+
+      clientSheet.mergeCells('A1:G2');
+      const cTitle = clientSheet.getCell('A1');
+      cTitle.value = `INVENTÁRIO TÉCNICO: ${clientName.toUpperCase()}`;
+      cTitle.style = { font: { bold: true, size: 12, color: { argb: 'FF059669' } }, alignment: { horizontal: 'center', vertical: 'middle' } };
+
+      const allDisks = getAllDisks(m);
+      const tableHeaders = ['CAMINHO', 'STATUS', 'REALIZADAS', 'TOTAL', '%', 'MAPEADO', 'ENVIADO'];
+      const hRow = clientSheet.getRow(4);
+      tableHeaders.forEach((h, i) => {
+        const cell = hRow.getCell(i + 1);
+        cell.value = h;
+        cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } }, alignment: { horizontal: 'center' } };
+      });
+
+      allDisks.forEach((d: any, idx: number) => {
+        const r = clientSheet.getRow(5 + idx);
+        const prog = Number(d.totalPastas) > 0 ? Math.min(1, Number(d.pastasRealizadas) / Number(d.totalPastas)) : 0;
+        r.getCell(1).value = d.path;
+        r.getCell(2).value = d.status;
+        r.getCell(3).value = Number(d.pastasRealizadas) || 0;
+        r.getCell(4).value = Number(d.totalPastas) || 0;
+        r.getCell(5).value = prog;
+        r.getCell(5).numFmt = '0.0%';
+        r.getCell(6).value = parseNum(d.storageMapeado);
+        r.getCell(6).numFmt = '#,##0.00';
+        r.getCell(7).value = parseNum(d.storageEnviado);
+        r.getCell(7).numFmt = '#,##0.00';
+        
+        r.eachCell(cell => { cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } }; });
+      });
+
+      const cHealthData = [
+        { label: 'OK', value: allDisks.filter((d: any) => d.status === 'Realizado').length, color: '#10b981' },
+        { label: 'Pendente', value: allDisks.filter((d: any) => d.status !== 'Realizado').length, color: '#f59e0b' }
+      ].filter((h: any) => h.value > 0);
+
+      if (cHealthData.length > 0) {
+        const chartImg = await generateChartImage('pie', cHealthData, 'Saúde da Migração');
+        const chartId = workbook.addImage({ base64: chartImg as string, extension: 'png' });
+        clientSheet.addImage(chartId, { tl: { col: 7, row: 4 }, ext: { width: 300, height: 250 } });
+      }
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `MigraFlow_Inventario_Tecnico_${new Date().toISOString().split('T')[0]}.xlsx`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+
 
   // Stats
   const stats = [
@@ -257,19 +1311,15 @@ function DashboardContent() {
     const rawName = getClientName(m);
     const clientName = rawName ? rawName.trim() : "Cliente Indefinido";
 
-    const allDisks = [
-      ...(m.disks || []),
-      ...(m.groups?.flatMap(g => g.disks || []) || [])
-    ];
+    const allDisks = getAllDisks(m);
 
-    const studies = allDisks.reduce((sum, d) => sum + (Number(d.estudos) || 0), 0);
-    // Sum totalPastas, but if not available, sum pastasRealizadas to ensure SOMETHING shows up if data exists
-    const folders = allDisks.reduce((sum, d) => {
+    const studies = allDisks.reduce((sum: number, d: any) => sum + (Number(d.estudos) || 0), 0);
+    const folders = allDisks.reduce((sum: number, d: any) => {
       const total = Number(d.totalPastas) || 0;
       const realized = Number(d.pastasRealizadas) || 0;
       return sum + (total > 0 ? total : realized);
     }, 0);
-    const volume = allDisks.reduce((sum, d) => sum + (Number(d.storageMapeado) || 0), 0);
+    const volume = allDisks.reduce((sum: number, d: any) => sum + (Number(d.storageMapeado) || 0), 0);
 
     if (!acc[clientName]) {
       acc[clientName] = { name: clientName, estudos: 0, pastas: 0, volume: 0 };
@@ -339,6 +1389,13 @@ function DashboardContent() {
             active={activeTab === 'migrations'}
             isCollapsed={isSidebarCollapsed}
             onClick={() => { setActiveTab('migrations'); setSelectedMigrationId(null); }}
+          />
+          <SidebarLink
+            icon={ClipboardList}
+            label="Relatórios"
+            active={activeTab === 'reports'}
+            isCollapsed={isSidebarCollapsed}
+            onClick={() => { setActiveTab('reports'); setSelectedMigrationId(null); }}
           />
         </nav>
 
@@ -427,7 +1484,8 @@ function DashboardContent() {
             <h2 className="text-sm md:text-xl font-black text-slate-900 uppercase tracking-tighter truncate">
               {selectedMigration ? `Detalhamento: ${getClientName(selectedMigration)}` : (
                 activeTab === 'overview' ? 'Painel de Monitoramento' :
-                  activeTab === 'clients' ? 'Gestão de Clientes' : 'Migrações'
+                  activeTab === 'clients' ? 'Gestão de Clientes' : 
+                    activeTab === 'reports' ? 'Centro de Inteligência' : 'Migrações'
               )}
             </h2>
             <p className="hidden md:block text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">
@@ -874,9 +1932,9 @@ function DashboardContent() {
                       atrasada: { color: 'bg-rose-100 text-rose-600', label: 'Atraso' },
                     }[m.status || 'pendente'] || { color: 'bg-slate-100 text-slate-600', label: 'Pendente' };
 
-                    const allDisks = [...(m.disks || []), ...(m.groups?.flatMap(g => g.disks || []) || [])];
-                    const total = allDisks.reduce((sum, d) => sum + (Number(d.totalPastas) || 0), 0);
-                    const realized = allDisks.reduce((sum, d) => {
+                    const allDisks = getAllDisks(m);
+                    const total = allDisks.reduce((sum: number, d: any) => sum + (Number(d.totalPastas) || 0), 0);
+                    const realized = allDisks.reduce((sum: number, d: any) => {
                       const t = Number(d.totalPastas) || 0;
                       const r = Number(d.pastasRealizadas) || 0;
                       return sum + Math.min(r, t);
@@ -947,7 +2005,7 @@ function DashboardContent() {
                         </th>
                         <th className="px-6 py-4 w-[20%]">Escopo</th>
                         <th className="px-6 py-4 text-center w-[20%]">Progresso</th>
-                        <th className="px-6 py-4 text-center w-[15%]">Status</th>
+                        <th className="px-6 py-4 text-center w-[20%]">Status</th>
                         <th className="px-6 py-4 w-[12%] text-center">Data</th>
                         <th className="px-6 py-4 text-right pr-6 w-[8%]"></th>
                       </tr>
@@ -974,9 +2032,9 @@ function DashboardContent() {
                           </td>
                           <td className="px-6 py-4">
                             {(() => {
-                              const allDisks = [...(m.disks || []), ...(m.groups?.flatMap(g => g.disks || []) || [])];
-                              const total = allDisks.reduce((sum, d) => sum + (Number(d.totalPastas) || 0), 0);
-                              const realized = allDisks.reduce((sum, d) => {
+                              const allDisks = getAllDisks(m);
+                              const total = allDisks.reduce((sum: number, d: any) => sum + (Number(d.totalPastas) || 0), 0);
+                              const realized = allDisks.reduce((sum: number, d: any) => {
                                 const t = Number(d.totalPastas) || 0;
                                 const r = Number(d.pastasRealizadas) || 0;
                                 return sum + Math.min(r, t);
@@ -1043,6 +2101,25 @@ function DashboardContent() {
                 </div>
               </motion.div>
             )}
+            {activeTab === 'reports' && (
+              <motion.div
+                key="reports"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+              >
+                <ReportsView 
+                  migrations={migrations} 
+                  onGenerateIncidencesReport={generateIncidencesReport} 
+                  onGenerateHandoffReport={generateHandoffReport}
+                  onGenerateExecutiveReport={generateExecutiveReport}
+                  onGenerateInventoryReport={generateInventoryReport}
+                  onGenerateLaudosReport={generateLaudosReport}
+                  onGenerateStorageReport={generateInventoryReport}
+                  onGenerateDensityReport={generateDensityReport}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </main>
@@ -1097,6 +2174,12 @@ function DashboardContent() {
           label="Migrações"
           active={activeTab === 'migrations'}
           onClick={() => { setActiveTab('migrations'); setSelectedMigrationId(null); }}
+        />
+        <BottomNavLink
+          icon={ClipboardList}
+          label="Relatórios"
+          active={activeTab === 'reports'}
+          onClick={() => { setActiveTab('reports'); setSelectedMigrationId(null); }}
         />
         {!isGuest && (
           <BottomNavLink
@@ -1945,29 +3028,16 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
   // Security: Delete Confirmation & Undo
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ groupId: string, idx: number, type: 'disk' | 'laudo' } | null>(null);
-  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ groupId: string, type: 'disks' | 'laudos' } | null>(null);
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ groupId: string, type: 'all' } | null>(null);
   const [lastDeletedDisk, setLastDeletedDisk] = useState<{ groupId: string, disk: Disk, idx: number } | null>(null);
   const [lastDeletedLaudo, setLastDeletedLaudo] = useState<{ groupId: string, laudo: Laudo, idx: number } | null>(null);
-  const [lastBulkDelete, setLastBulkDelete] = useState<{ groupId: string, type: 'disks' | 'laudos', items: any[] } | null>(null);
+  const [lastBulkDelete, setLastBulkDelete] = useState<{ groupId: string, data: { disks: Disk[], laudos: Laudo[] } } | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
   const [undoType, setUndoType] = useState<'disk' | 'laudo' | 'bulk'>('disk');
 
   useEffect(() => {
     setEditedGroups(migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }]));
   }, [migration.groups, migration.disks]);
-
-  const parseNum = (val: any) => {
-    if (typeof val === 'number') return val;
-    if (!val) return 0;
-    const s = String(val);
-    // Se contém vírgula, tratamos como formato brasileiro (ex: 1.234,56 ou 5,81)
-    if (s.includes(',')) {
-      const cleanVal = s.replace(/\./g, '').replace(',', '.');
-      return parseFloat(cleanVal) || 0;
-    }
-    // Se não contém vírgula, tratamos como formato padrão JS/US (ex: 1234.56 ou 5.81)
-    return parseFloat(s) || 0;
-  };
 
   const allDisks = editedGroups.flatMap(g => g.disks);
 
@@ -1986,7 +3056,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
   const total = summary.totalPastas;
   const realized = summary.pastasRealizadas;
-  summary.progresso = total > 0 ? Number(((realized / total) * 100).toFixed(2)) : 0;
+  summary.progresso = total > 0 ? Math.min(100, Number(((realized / total) * 100).toFixed(2))) : 0;
 
   const allLaudos = editedGroups.flatMap(g => g.laudos || []);
   const laudosSummary = {
@@ -1994,7 +3064,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
     realizados: allLaudos.reduce((acc, l) => acc + parseNum(l.realizados), 0),
     progresso: 0
   };
-  laudosSummary.progresso = laudosSummary.total > 0 ? Number(((laudosSummary.realizados / laudosSummary.total) * 100).toFixed(2)) : 0;
+  laudosSummary.progresso = laudosSummary.total > 0 ? Math.min(100, Number(((laudosSummary.realizados / laudosSummary.total) * 100).toFixed(2))) : 0;
 
   const getGroupSummary = (groupDisks: Disk[]) => {
     const totalPastas = groupDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0);
@@ -2053,6 +3123,12 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
     setIsDeleteConfirmOpen(true);
   };
 
+  const clearAllData = (groupId: string) => {
+    if (isGuest) return;
+    setBulkDeleteTarget({ groupId, type: 'all' });
+    setIsDeleteConfirmOpen(true);
+  };
+
   const confirmRemoveItem = () => {
     if (!deleteTarget || isGuest) return;
     const { groupId, idx, type } = deleteTarget;
@@ -2074,43 +3150,32 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       setUndoType('laudo');
       setEditedGroups(editedGroups.map(g => g.id === groupId ? {
         ...g,
-        laudos: (g.laudos || []).filter((_: Laudo, i: number) => i !== idx)
+        laudos: (group.laudos || []).filter((_: Laudo, i: number) => i !== idx)
       } : g));
     }
     
     setIsEditing(true);
     setIsDeleteConfirmOpen(false);
     setDeleteTarget(null);
-    
-    // Show undo toast
     setShowUndoToast(true);
-    setTimeout(() => setShowUndoToast(false), 8000); // 8 seconds to undo
+    setTimeout(() => setShowUndoToast(false), 8000);
   };
 
   const confirmBulkDelete = () => {
     if (!bulkDeleteTarget || isGuest) return;
-    const { groupId, type } = bulkDeleteTarget;
+    const { groupId } = bulkDeleteTarget;
     
     const group = editedGroups.find(g => g.id === groupId);
     if (!group) return;
     
-    const items = type === 'disks' ? group.disks : (group.laudos || []);
-    
-    // Save for undo
-    setLastBulkDelete({ groupId, type, items });
+    setLastBulkDelete({ groupId, data: { disks: group.disks || [], laudos: group.laudos || [] } });
     setUndoType('bulk');
     
-    // Clear
-    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
-      ...g,
-      [type]: []
-    } : g));
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? { ...g, disks: [], laudos: [] } : g));
     
     setIsEditing(true);
     setIsDeleteConfirmOpen(false);
     setBulkDeleteTarget(null);
-    
-    // Show undo toast
     setShowUndoToast(true);
     setTimeout(() => setShowUndoToast(false), 8000);
   };
@@ -2133,14 +3198,10 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       } : g));
       setLastDeletedLaudo(null);
     } else if (undoType === 'bulk' && lastBulkDelete) {
-      const { groupId, type, items } = lastBulkDelete;
-      setEditedGroups(editedGroups.map(g => g.id === groupId ? {
-        ...g,
-        [type]: items
-      } : g));
+      const { groupId, data } = lastBulkDelete;
+      setEditedGroups(editedGroups.map(g => g.id === groupId ? { ...g, disks: data.disks, laudos: data.laudos } : g));
       setLastBulkDelete(null);
     }
-    
     setShowUndoToast(false);
   };
 
@@ -2172,31 +3233,6 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
     setIsEditing(true);
   };
 
-  const removeLaudoFromGroup = (groupId: string, laudoIdx: number) => {
-    askRemoveLaudo(groupId, laudoIdx);
-  };
-
-  const updateLaudoInGroup = (groupId: string, laudoId: string, data: Partial<Laudo>) => {
-    if (isGuest) return;
-    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
-      ...g,
-      laudos: (g.laudos || []).map(l => l.id === laudoId ? { ...l, ...data } : l)
-    } : g));
-    setIsEditing(true);
-  };
-
-  const clearAllDisks = (groupId: string) => {
-    if (isGuest) return;
-    setBulkDeleteTarget({ groupId, type: 'disks' });
-    setIsDeleteConfirmOpen(true);
-  };
-
-  const clearAllLaudos = (groupId: string) => {
-    if (isGuest) return;
-    setBulkDeleteTarget({ groupId, type: 'laudos' });
-    setIsDeleteConfirmOpen(true);
-  };
-
   const saveComment = () => {
     if (!commentModalTarget || isGuest) return;
     updateDiskInGroup(commentModalTarget.groupId, commentModalTarget.diskIdx, {
@@ -2209,15 +3245,13 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
     setCommentModalTarget(null);
   };
 
-  const getSeverityColor = (sev: NonNullable<Disk['comment']>['severity']) => {
-    switch (sev) {
-      case 'sem_prioridade': return 'bg-slate-900 text-white';
-      case 'baixa': return 'bg-blue-50 text-blue-600 border border-blue-100';
-      case 'media': return 'bg-amber-50 text-amber-600 border border-amber-100';
-      case 'alta': return 'bg-orange-50 text-orange-600 border border-orange-100';
-      case 'urgente': return 'bg-rose-50 text-rose-600 border border-rose-100';
-      default: return 'bg-slate-50 text-slate-400';
-    }
+  const updateLaudoInGroup = (groupId: string, laudoId: string, data: Partial<Laudo>) => {
+    if (isGuest) return;
+    setEditedGroups(editedGroups.map(g => g.id === groupId ? {
+      ...g,
+      laudos: (g.laudos || []).map(l => l.id === laudoId ? { ...l, ...data } : l)
+    } : g));
+    setIsEditing(true);
   };
 
   const copyInsight = async () => {
@@ -2228,6 +3262,17 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
       setTimeout(() => setCopiedInsight(false), 2000);
     } catch (err) {
       console.error('Failed to copy insight:', err);
+    }
+  };
+
+  const getSeverityColor = (sev: NonNullable<Disk['comment']>['severity']) => {
+    switch (sev) {
+      case 'sem_prioridade': return 'bg-slate-900 text-white';
+      case 'baixa': return 'bg-blue-50 text-blue-600 border border-blue-100';
+      case 'media': return 'bg-amber-50 text-amber-600 border border-amber-100';
+      case 'alta': return 'bg-orange-50 text-orange-600 border border-orange-100';
+      case 'urgente': return 'bg-rose-50 text-rose-600 border border-rose-100';
+      default: return 'bg-slate-50 text-slate-400';
     }
   };
 
@@ -2340,7 +3385,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
             if (currentEnviado < lastEnviado) lastEnviado = 0;
             
             const individualMapeado = Math.max(0, currentMapeado - lastMapeado);
-            const individualEnviado = Math.max(0, currentEnviado - lastEnviado);
+            const individualEnviado = Math.max(0, currentEnviado - lastMapeado);
             
             lastMapeado = currentMapeado;
             lastEnviado = currentEnviado;
@@ -2438,90 +3483,29 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Resumo Executivo Horizontal */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="bg-slate-900 px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+          <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Resumo Geral</h3>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <BarChart3 className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Resumo Geral da Migração</h3>
-              <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-0.5">Indicadores Globais de Performance</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 md:gap-3">
             {isEditing && (
-              <button
-                onClick={handleSave}
-                className="bg-emerald-600 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 border border-emerald-500/50"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 md:w-4 md:h-4" /> <span className="hidden sm:inline">Salvar</span>
-              </button>
+              <button onClick={handleSave} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all">Salvar</button>
             )}
-            <button
-              onClick={generateAISummary}
-              disabled={isGeneratingInsight}
-              className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 border border-blue-500/50 disabled:opacity-50"
-            >
-              <Sparkles className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isGeneratingInsight ? 'animate-pulse' : ''}`} /> 
-              <span className="hidden sm:inline">{isGeneratingInsight ? 'Gerando...' : 'IA Insight'}</span>
-              {!isGeneratingInsight && <span className="sm:hidden">IA</span>}
-            </button>
+            <button onClick={generateAISummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all">IA Insight</button>
           </div>
         </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-y divide-x-0 md:divide-y-0 md:divide-x divide-slate-100 bg-white">
-          <div className="p-6 flex flex-col items-center text-center">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Total de Pastas</span>
-            <span className="text-2xl font-black text-slate-900 tracking-tighter">{summary.totalPastas.toLocaleString()}</span>
-          </div>
-          <div className="p-6 flex flex-col items-center text-center">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Pastas Realizadas</span>
-            <span className="text-2xl font-black text-emerald-600 tracking-tighter">{summary.pastasRealizadas.toLocaleString()}</span>
-          </div>
-          <div className="p-6 flex flex-col items-center text-center">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Estudos Enviados</span>
-            <span className="text-2xl font-black text-slate-900 tracking-tighter">{summary.estudosEnviados.toLocaleString()}</span>
-          </div>
-          <div className="p-6 flex flex-col items-center text-center">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Mapeado (TB)</span>
-            <span className="text-2xl font-black text-blue-600 tracking-tighter">{summary.storageMapeado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div className="p-6 flex flex-col items-center text-center">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Enviado (TB)</span>
-            <span className="text-2xl font-black text-blue-600 tracking-tighter">{summary.storageEnviado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div className="p-6 flex flex-col items-center justify-center bg-slate-50/50">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Progresso Total</span>
-            <div className="flex items-center gap-3">
-              <span className={`text-3xl font-black tracking-tighter transition-colors ${summary.progresso === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>
-                {summary.progresso}%
-              </span>
-              <div className="w-12 h-12 relative">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                  <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-200" strokeWidth="4" />
-                  <circle 
-                    cx="18" cy="18" r="16" fill="none" 
-                    className={`${summary.progresso === 100 ? 'stroke-emerald-600' : 'stroke-blue-600'} transition-all duration-1000`} 
-                    strokeWidth="4" 
-                    strokeDasharray={`${summary.progresso}, 100`} 
-                    strokeLinecap="round" 
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-6 divide-y divide-slate-100">
+          <div className="p-6 text-center"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pastas</span><div className="text-2xl font-black">{summary.pastasRealizadas.toLocaleString()}</div></div>
+          <div className="p-6 text-center"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Estudos</span><div className="text-2xl font-black">{summary.estudosEnviados.toLocaleString()}</div></div>
+          <div className="p-6 text-center"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Enviado (TB)</span><div className="text-2xl font-black">{summary.storageEnviado.toLocaleString()}</div></div>
+          <div className="p-6 text-center"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Progresso</span><div className="text-2xl font-black">{summary.progresso}%</div></div>
         </div>
       </div>
 
-      {/* Groups and Tables Section */}
       <div className="space-y-12">
         {editedGroups.map((group) => {
           const groupSummary = getGroupSummary(group.disks);
           return (
             <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              {/* Group Executive Summary - Only show Disks summary if there are disks or if it's not a pure Laudos unit */}
               {group.disks.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-6 divide-x divide-slate-50 bg-slate-50/50 border-b border-slate-100">
                   <div className="p-3 flex flex-col items-center justify-center text-center">
@@ -2562,31 +3546,29 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
 
               <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 w-full">
-                  {isEditing ? (
+                  <div className="flex flex-col flex-1 min-w-0">
                     <input
                       type="text"
+                      readOnly={isGuest}
+                      className="text-sm font-black text-slate-900 uppercase tracking-tight bg-transparent border-b border-transparent focus:border-blue-600 outline-none transition-all w-full md:w-auto"
                       value={group.title}
                       onChange={e => updateGroupTitle(group.id, e.target.value)}
-                      className="bg-white border border-blue-200 rounded px-3 py-1 text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 w-full"
                     />
-                  ) : (
-                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2 truncate">
-                      {group.disks.length > 0 ? (
-                        <HardDrive className="w-4 h-4 text-blue-600 shrink-0" />
-                      ) : (
-                        <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
-                      )}
-                      {group.title}
-                    </h3>
-                  )}
-                  {group.disks.length > 0 ? (
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest shrink-0">{group.disks.length} Discos</span>
-                  ) : (
-                    <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-widest shrink-0 border border-emerald-100">Unidade Clínica</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Identificador de Unidade</span>
+                  </div>
+                  {!isGuest && editedGroups.length > 1 && (
+                    <button
+                      onClick={() => removeGroup(group.id)}
+                      className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all active:scale-95 group/del shrink-0"
+                      title="Remover Unidade Inteira"
+                    >
+                      <Trash2 className="w-4 h-4 group-hover/del:scale-110 transition-transform" />
+                    </button>
                   )}
                 </div>
+                
                 {!isGuest && (
-                  <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <label className="whitespace-nowrap text-[9px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
                       <FileUp className="w-3 h-3" /> Importar
                       <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
@@ -2605,32 +3587,15 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                     </button>
                     <div className="w-px h-4 bg-slate-200 mx-1 hidden md:block" />
                     <button
-                      onClick={() => clearAllDisks(group.id)}
+                      onClick={() => clearAllData(group.id)}
                       className="whitespace-nowrap text-[9px] text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest transition-all flex items-center gap-2"
-                      title="Excluir todos os discos desta unidade"
+                      title="Apagar todos os dados desta unidade (Discos e Laudos)"
                     >
-                      <Trash2 className="w-3 h-3" /> Limpar Discos
+                      <Trash2 className="w-3 h-3" /> Limpar Tudo
                     </button>
-                    <button
-                      onClick={() => clearAllLaudos(group.id)}
-                      className="whitespace-nowrap text-[9px] text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest transition-all flex items-center gap-2"
-                      title="Excluir todos os laudos desta unidade"
-                    >
-                      <Trash2 className="w-3 h-3" /> Limpar Laudos
-                    </button>
-                    {isEditing && editedGroups.length > 1 && (
-                      <button
-                        onClick={() => removeGroup(group.id)}
-                        className="whitespace-nowrap text-[9px] bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2"
-                      >
-                        <Trash2 className="w-3 h-3" /> Remover
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
-              
-              {/* Only show disks section if there are disks */}
               {group.disks.length > 0 && (
                 <>
                   {/* Mobile Card Layout for Disks */}
@@ -2996,7 +3961,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                           )}
                           {!isGuest && group.laudos && group.laudos.length > 0 && (
                             <button
-                              onClick={() => clearAllLaudos(group.id)}
+                              onClick={() => clearAllData(group.id)}
                               className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline px-2"
                             >
                               Limpar Tudo
@@ -3208,7 +4173,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                   const itemsBefore = allLaudos.slice(0, idx + 1);
                   const cumRealizados = itemsBefore.reduce((acc, x) => acc + parseNum(x.realizados), 0);
                   const cumTotal = itemsBefore.reduce((acc, x) => acc + parseNum(x.total), 0);
-                  const progressPercent = cumTotal > 0 ? Number(((cumRealizados / cumTotal) * 100).toFixed(1)) : 0;
+                  const progressPercent = cumTotal > 0 ? Math.min(100, Number(((cumRealizados / cumTotal) * 100).toFixed(1))) : 0;
                   return {
                     periodo: l.periodo || `Período ${idx + 1}`,
                     realizados: parseNum(l.realizados),
@@ -3534,7 +4499,7 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                 </p>
                 <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">
                   {undoType === 'bulk' 
-                    ? `Todos os ${lastBulkDelete?.type === 'disks' ? 'discos' : 'laudos'} da unidade foram limpos`
+                    ? 'Todos os dados da unidade foram limpos'
                     : undoType === 'disk' 
                       ? (lastDeletedDisk?.disk.path || 'Sem caminho')
                       : (lastDeletedLaudo?.laudo.periodo || 'Sem período')
@@ -3579,13 +4544,13 @@ function MigrationDetails({ migration, onUpdate, isGuest }: { migration: any, on
                 </div>
                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">
                   {bulkDeleteTarget 
-                    ? `Limpar ${bulkDeleteTarget?.type === 'disks' ? 'Discos' : 'Laudos'}?` 
+                    ? 'Limpar Toda Unidade?' 
                     : deleteTarget?.type === 'disk' ? 'Excluir Disco?' : 'Excluir Laudo?'
                   }
                 </h2>
                 <p className="text-sm text-slate-500 leading-relaxed font-medium">
                   {bulkDeleteTarget 
-                    ? `Tem certeza que deseja remover TODOS os ${bulkDeleteTarget?.type === 'disks' ? 'discos' : 'laudos'} desta unidade? Esta ação pode ser desfeita.`
+                    ? 'Tem certeza que deseja remover TODOS os dados desta unidade? Esta ação pode ser desfeita.'
                     : deleteTarget?.type === 'disk'
                       ? "Esta ação removerá o disco e todas as métricas associadas. Deseja continuar?"
                       : "Esta ação removerá o registro do laudo deste período. Deseja continuar?"

@@ -70,6 +70,7 @@ export interface Client {
   email: string;
   company: string;
   description?: string;
+  comments?: { text: string; date: string; severity?: string }[];
   createdAt: any;
 }
 
