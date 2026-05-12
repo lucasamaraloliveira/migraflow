@@ -1,12 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Edit2, 
   Trash2, 
   FileText, 
-  Copy 
+  Copy,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -25,15 +28,75 @@ export default function ClientsView({
   setIsClientModalOpen,
   triggerDelete
 }: ClientsViewProps) {
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'name', direction: 'asc' });
+
+  const sortedClients = useMemo(() => {
+    let sortableItems = [...clients];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue = a[sortConfig.key] || '';
+        let bValue = b[sortConfig.key] || '';
+
+        // Case insensitive for strings
+        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+        // Handle nested objects like createdAt
+        if (sortConfig.key === 'createdAt') {
+          aValue = a.createdAt?.seconds || 0;
+          bValue = b.createdAt?.seconds || 0;
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [clients, sortConfig]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: string) => {
+    if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
+      {/* Mobile Toolbar for Sorting */}
+      <div className="md:hidden flex gap-2 mb-4 overflow-x-auto pb-2 custom-scrollbar">
+        <button 
+          onClick={() => requestSort('name')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all shrink-0 ${sortConfig?.key === 'name' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}
+        >
+          Nome {getSortIcon('name')}
+        </button>
+        <button 
+          onClick={() => requestSort('createdAt')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all shrink-0 ${sortConfig?.key === 'createdAt' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}
+        >
+          Data {getSortIcon('createdAt')}
+        </button>
+      </div>
+
       {/* Mobile Card Layout for Clients */}
       <div className="grid grid-cols-1 gap-4 md:hidden">
-        {clients.map((client) => (
+        {sortedClients.map((client) => (
           <div key={client.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-200 transition-all active:scale-[0.98]">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-3">
@@ -84,15 +147,36 @@ export default function ClientsView({
         <table className="w-full text-left">
           <thead>
             <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">
-              <th className="px-6 py-4">Cliente / Empresa</th>
+              <th 
+                className="px-6 py-4 cursor-pointer hover:text-white transition-colors group"
+                onClick={() => requestSort('name')}
+              >
+                <div className="flex items-center gap-2">
+                  Cliente / Empresa {getSortIcon('name')}
+                </div>
+              </th>
               <th className="px-6 py-4">Observações</th>
-              <th className="px-6 py-4">Contato</th>
-              <th className="px-6 py-4">Data de Cadastro</th>
+              <th 
+                className="px-6 py-4 cursor-pointer hover:text-white transition-colors group"
+                onClick={() => requestSort('email')}
+              >
+                <div className="flex items-center gap-2">
+                  Contato {getSortIcon('email')}
+                </div>
+              </th>
+              <th 
+                className="px-6 py-4 cursor-pointer hover:text-white transition-colors group"
+                onClick={() => requestSort('createdAt')}
+              >
+                <div className="flex items-center gap-2">
+                  Data de Cadastro {getSortIcon('createdAt')}
+                </div>
+              </th>
               <th className="px-6 py-4 text-right pr-12">Operação</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {clients.map((client) => (
+            {sortedClients.map((client) => (
               <tr key={client.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-4">

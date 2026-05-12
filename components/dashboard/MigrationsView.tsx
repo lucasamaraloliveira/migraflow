@@ -1,17 +1,15 @@
-'use client';
-
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Edit2, 
   Trash2, 
   HardDrive, 
-  ArrowUpAZ, 
-  ArrowDownAZ, 
-  ChevronRight 
+  ChevronUp, 
+  ChevronDown, 
+  ArrowUpDown 
 } from 'lucide-react';
 import StatusBadge from '@/components/common/StatusBadge';
-import { getClientName, getAllDisks } from '@/lib/utils';
+import { getClientName, getAllDisks, parseNum } from '@/lib/utils';
 
 interface MigrationsViewProps {
   migrations: any[];
@@ -28,12 +26,72 @@ export default function MigrationsView({
   migrations,
   clients,
   isGuest,
-  sortOrder,
-  setSortOrder,
+  sortOrder: _sortOrder,
+  setSortOrder: _setSortOrder,
   setSelectedMigrationId,
   updateMigration,
   triggerDelete
 }: MigrationsViewProps) {
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'clientName', direction: 'asc' });
+
+  const sortedMigrations = useMemo(() => {
+    let sortableItems = [...migrations].map(m => ({
+      ...m,
+      clientName: getClientName(m, clients)
+    }));
+
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue = a[sortConfig.key] || '';
+        let bValue = b[sortConfig.key] || '';
+
+        if (sortConfig.key === 'progress') {
+          const disksA = getAllDisks(a);
+          const totalA = disksA.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
+          const realizedA = disksA.reduce((sum: number, d: any) => sum + Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas)), 0);
+          aValue = totalA > 0 ? realizedA / totalA : 0;
+
+          const disksB = getAllDisks(b);
+          const totalB = disksB.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
+          const realizedB = disksB.reduce((sum: number, d: any) => sum + Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas)), 0);
+          bValue = totalB > 0 ? realizedB / totalB : 0;
+        }
+
+        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [migrations, clients, sortConfig]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: string) => {
+    if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />;
+  };
+
+  const statusMap: Record<string, { color: string, label: string }> = {
+    pendente: { color: 'bg-slate-100 text-slate-600', label: 'Pendente' },
+    em_progresso: { color: 'bg-blue-100 text-blue-600', label: 'Execução' },
+    pausado: { color: 'bg-amber-100 text-amber-600', label: 'Pausado' },
+    concluida: { color: 'bg-emerald-100 text-emerald-600', label: 'Concluída' },
+    atrasada: { color: 'bg-rose-100 text-rose-600', label: 'Atraso' },
+  };
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -41,28 +99,38 @@ export default function MigrationsView({
       exit={{ opacity: 0 }}
       className="grid grid-cols-1 gap-6"
     >
+      {/* Mobile Toolbar for Sorting */}
+      <div className="md:hidden flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+        <button 
+          onClick={() => requestSort('clientName')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all shrink-0 ${sortConfig?.key === 'clientName' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}
+        >
+          Nome {getSortIcon('clientName')}
+        </button>
+        <button 
+          onClick={() => requestSort('progress')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all shrink-0 ${sortConfig?.key === 'progress' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}
+        >
+          Progresso {getSortIcon('progress')}
+        </button>
+        <button 
+          onClick={() => requestSort('endDate')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all shrink-0 ${sortConfig?.key === 'endDate' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}
+        >
+          Data {getSortIcon('endDate')}
+        </button>
+      </div>
+
       {/* Mobile Card Layout for Migrations */}
       <div className="grid grid-cols-1 gap-4 md:hidden">
-        {[...migrations].sort((a, b) => {
-          if (sortOrder === 'none') return 0;
-          const nameA = getClientName(a, clients).toLowerCase();
-          const nameB = getClientName(b, clients).toLowerCase();
-          return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-        }).map((m) => {
-          const statusMap: Record<string, { color: string, label: string }> = {
-            pendente: { color: 'bg-slate-100 text-slate-600', label: 'Pendente' },
-            em_progresso: { color: 'bg-blue-100 text-blue-600', label: 'Execução' },
-            pausado: { color: 'bg-amber-100 text-amber-600', label: 'Pausado' },
-            concluida: { color: 'bg-emerald-100 text-emerald-600', label: 'Concluída' },
-            atrasada: { color: 'bg-rose-100 text-rose-600', label: 'Atraso' },
-          };
+        {sortedMigrations.map((m) => {
           const statusConfig = statusMap[m.status as keyof typeof statusMap] || statusMap.pendente;
 
           const allDisks = getAllDisks(m);
-          const total = allDisks.reduce((sum: number, d: any) => sum + (Number(d.totalPastas) || 0), 0);
+          const total = allDisks.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
           const realized = allDisks.reduce((sum: number, d: any) => {
-            const t = Number(d.totalPastas) || 0;
-            const r = Number(d.pastasRealizadas) || 0;
+            const t = parseNum(d.totalPastas);
+            const r = parseNum(d.pastasRealizadas);
             return sum + Math.min(r, t);
           }, 0);
           const progress = total > 0 ? Math.round((realized / total) * 100) : 0;
@@ -120,29 +188,45 @@ export default function MigrationsView({
         <table className="w-full text-left table-fixed">
           <thead>
             <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">
-              <th className="px-6 py-4 w-[25%]">
-                <button
-                  onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                  className="flex items-center gap-2 hover:text-white transition-colors w-full"
-                >
+              <th 
+                className="px-6 py-4 w-[25%] cursor-pointer hover:text-white transition-colors group"
+                onClick={() => requestSort('clientName')}
+              >
+                <div className="flex items-center gap-2">
                   <span className="truncate">Identificação</span>
-                  {sortOrder === 'asc' ? <ArrowUpAZ className="w-4 h-4 text-blue-500 shrink-0" /> : <ArrowDownAZ className="w-4 h-4 shrink-0" />}
-                </button>
+                  {getSortIcon('clientName')}
+                </div>
               </th>
               <th className="px-6 py-4 w-[20%]">Escopo</th>
-              <th className="px-6 py-4 text-center w-[20%]">Progresso</th>
-              <th className="px-6 py-4 text-center w-[20%]">Status</th>
-              <th className="px-6 py-4 w-[12%] text-center">Data</th>
+              <th 
+                className="px-6 py-4 text-center w-[20%] cursor-pointer hover:text-white transition-colors group"
+                onClick={() => requestSort('progress')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Progresso {getSortIcon('progress')}
+                </div>
+              </th>
+              <th 
+                className="px-6 py-4 text-center w-[20%] cursor-pointer hover:text-white transition-colors group"
+                onClick={() => requestSort('status')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Status {getSortIcon('status')}
+                </div>
+              </th>
+              <th 
+                className="px-6 py-4 w-[12%] text-center cursor-pointer hover:text-white transition-colors group"
+                onClick={() => requestSort('endDate')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  Data {getSortIcon('endDate')}
+                </div>
+              </th>
               <th className="px-6 py-4 text-right pr-6 w-[8%]"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {[...migrations].sort((a, b) => {
-              if (sortOrder === 'none') return 0;
-              const nameA = getClientName(a, clients).toLowerCase();
-              const nameB = getClientName(b, clients).toLowerCase();
-              return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-            }).map((m) => (
+            {sortedMigrations.map((m) => (
               <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
                 <td className="px-6 py-4 overflow-hidden">
                   <button
@@ -159,22 +243,22 @@ export default function MigrationsView({
                 <td className="px-6 py-4">
                   {(() => {
                     const allDisks = getAllDisks(m);
-                    const total = allDisks.reduce((sum: number, d: any) => sum + (Number(d.totalPastas) || 0), 0);
+                    const total = allDisks.reduce((sum: number, d: any) => sum + parseNum(d.totalPastas), 0);
                     const realized = allDisks.reduce((sum: number, d: any) => {
-                      const t = Number(d.totalPastas) || 0;
-                      const r = Number(d.pastasRealizadas) || 0;
+                      const t = parseNum(d.totalPastas);
+                      const r = parseNum(d.pastasRealizadas);
                       return sum + Math.min(r, t);
                     }, 0);
                     const progress = total > 0 ? Math.round((realized / total) * 100) : 0;
                     return (
-                      <div className="flex items-center gap-3 min-w-[120px]">
-                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="flex items-center justify-center gap-3 w-full">
+                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-[100px]">
                           <div
                             className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-600'}`}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
-                        <span className={`text-[10px] font-black ${progress === 100 ? 'text-emerald-600' : 'text-slate-900'}`}>{progress}%</span>
+                        <span className={`text-[10px] font-black min-w-[30px] ${progress === 100 ? 'text-emerald-600' : 'text-slate-900'}`}>{progress}%</span>
                       </div>
                     );
                   })()}
@@ -185,7 +269,8 @@ export default function MigrationsView({
                     {!isGuest && (
                       <select
                         value={m.status}
-                        onChange={(e) => updateMigration(m.id!, { status: e.target.value as any })}
+                        onChange={(e) => { e.stopPropagation(); updateMigration(m.id!, { status: e.target.value as any }); }}
+                        onClick={(e) => e.stopPropagation()}
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] bg-slate-100 rounded px-1.5 py-0.5 cursor-pointer outline-none border border-slate-200 font-bold uppercase"
                       >
                         <option value="pendente">Pendente</option>
@@ -212,7 +297,7 @@ export default function MigrationsView({
                     </button>
                     {!isGuest && (
                       <button
-                        onClick={() => triggerDelete('migration', m.id!, getClientName(m, clients))}
+                        onClick={(e) => { e.stopPropagation(); triggerDelete('migration', m.id!, getClientName(m, clients)); }}
                         className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-lg transition-all border border-transparent hover:border-rose-100 opacity-0 group-hover:opacity-100"
                       >
                         <Trash2 className="w-4 h-4" />
