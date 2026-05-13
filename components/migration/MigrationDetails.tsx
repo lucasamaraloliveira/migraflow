@@ -774,9 +774,12 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
               {group.disks.length > 0 && (
                 <div className="grid grid-cols-1 gap-3 p-4 md:hidden bg-slate-50/30">
                   {group.disks.map((d: Disk, i: number) => {
+                    const isIncremental = migration.isIncremental;
                     const previousDisks = group.disks.slice(0, i);
                     const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
-                    const currentRunningEnviado = sumPrevEnviado + parseNum(d.storageEnviado);
+                    const currentRunningEnviado = isIncremental 
+                      ? parseNum(d.storageEnviado) 
+                      : (sumPrevEnviado + parseNum(d.storageEnviado));
 
                     return (
                       <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
@@ -899,9 +902,13 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                                     readOnly={isGuest}
                                     value={currentRunningEnviado}
                                     onChange={v => {
-                                      const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
-                                      const delta = Math.max(0, v - sumPrevEnviado);
-                                      updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
+                                      if (isIncremental) {
+                                        updateDiskInGroup(group.id, i, { storageEnviado: v });
+                                      } else {
+                                        const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
+                                        const delta = Math.max(0, v - sumPrevEnviado);
+                                        updateDiskInGroup(group.id, i, { storageEnviado: delta });
+                                      }
                                     }}
                                     className="w-16 text-right text-[11px] font-black text-emerald-600 bg-slate-50 outline-none focus:ring-1 focus:ring-emerald-100 rounded px-1.5 py-0.5"
                                   />
@@ -916,7 +923,7 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                                     isFloat
                                     readOnly={isGuest}
                                     value={d.storageMapeado}
-                                    onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v, storageEnviado: v })}
+                                    onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v })}
                                     className="w-16 text-left text-[11px] font-black text-slate-400 bg-slate-50 outline-none focus:ring-1 focus:ring-slate-100 rounded px-1.5 py-0.5"
                                   />
                                   <span className="text-[8px] font-black text-slate-400">TB</span>
@@ -1016,7 +1023,7 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                                     readOnly={isGuest}
                                     className="w-20 bg-slate-50 text-center text-xs font-black outline-none rounded py-1 px-1.5"
                                     value={d.storageMapeado}
-                                    onChange={v => updateDiskInGroup(group.id, i, isIncremental ? { storageMapeado: v } : { storageMapeado: v, storageEnviado: v })}
+                                    onChange={v => updateDiskInGroup(group.id, i, { storageMapeado: v })}
                                   />
                                   <span className="text-[8px] font-black text-slate-400">TB</span>
                                 </div>
@@ -1037,7 +1044,7 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                                       } else {
                                         const sumPrevEnviado = previousDisks.reduce((acc, prev) => acc + parseNum(prev.storageEnviado), 0);
                                         const delta = Math.max(0, v - sumPrevEnviado);
-                                        updateDiskInGroup(group.id, i, { storageMapeado: delta, storageEnviado: delta });
+                                        updateDiskInGroup(group.id, i, { storageEnviado: delta });
                                       }
                                     }}
                                   />

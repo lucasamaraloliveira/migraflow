@@ -22,10 +22,11 @@ import {
   PieChart, 
   Pie, 
   Cell, 
-  LabelList 
+  LabelList,
+  Treemap
 } from 'recharts';
 import StatusBadge from '@/components/common/StatusBadge';
-import { getClientName } from '@/lib/utils';
+import { getClientName, getAllDisks } from '@/lib/utils';
 
 interface OverviewProps {
   stats: any[];
@@ -71,84 +72,83 @@ export default function Overview({
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 h-[400px] md:h-[350px] flex flex-col overflow-hidden">
+        <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 min-h-[500px] flex flex-col">
           <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight mb-6 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-blue-600" />
-            Volumetria por Cliente (Estudos vs Pastas)
+            Volumetria Global por Cliente (Ranking)
           </h3>
-          <div className="flex-1 min-h-[300px]">
-            {/* Desktop Chart: Vertical Bars */}
-            <div className="hidden md:block h-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ bottom: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis
-                    dataKey="name"
-                    fontSize={10}
-                    stroke="#94a3b8"
-                    interval={0}
-                    angle={-15}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis fontSize={10} stroke="#94a3b8" />
-                  <Tooltip
-                    formatter={(value: any, name: any) => {
-                      const label = name === 'volume' ? 'Volume' :
-                        name === 'estudos' ? 'Estudos' :
-                        name === 'pastas' ? 'Pastas' : 
-                        name === 'laudos' ? 'Laudos' : name;
-                      const unit = name === 'volume' ? ' TB' : '';
-                      return [`${value?.toLocaleString() || '0'}${unit}`, label];
-                    }}
-                    contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff' }}
-                    itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
-                  />
-                  <Bar dataKey="estudos" fill="#2563eb" radius={[4, 4, 0, 0]} name="Estudos">
-                    <LabelList dataKey="estudos" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#1e293b' }} />
-                  </Bar>
-                  <Bar dataKey="laudos" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Laudos">
-                    <LabelList dataKey="laudos" position="top" formatter={(v: any) => v > 0 ? v.toLocaleString() : ''} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#b45309' }} />
-                  </Bar>
-                  <Bar dataKey="pastas" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Pastas">
-                    <LabelList dataKey="pastas" position="top" formatter={(v: any) => v.toLocaleString()} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#64748b' }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Mobile Chart: Horizontal Bars for better legibility */}
-            <div className="md:hidden h-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1 overflow-hidden">
+            {/* Column 1: First Half */}
+            <div className="h-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   layout="vertical"
-                  data={chartData}
-                  margin={{ top: 5, right: 20, left: 50, bottom: 5 }}
+                  data={chartData.slice(0, Math.ceil(chartData.length / 2))}
+                  margin={{ top: 0, right: 30, left: 80, bottom: 0 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                   <XAxis type="number" hide />
                   <YAxis
                     dataKey="name"
                     type="category"
-                    fontSize={8}
+                    fontSize={9}
                     stroke="#94a3b8"
-                    width={90}
+                    width={75}
                     tick={{ fontWeight: 'bold' }}
                     interval={0}
+                    tickFormatter={(val) => val.length > 15 ? val.substring(0, 12) + '...' : val}
                   />
                   <Tooltip
-                    formatter={(value: any, name: any) => {
-                      const label = name === 'estudos' ? 'Estudos' : name === 'laudos' ? 'Laudos' : 'Pastas';
-                      return [`${value?.toLocaleString() || '0'}`, label];
-                    }}
-                    contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', color: '#fff' }}
-                    itemStyle={{ fontSize: '10px' }}
+                    formatter={(v: any, n: any) => [v.toLocaleString(), n === 'estudos' ? 'Estudos' : n === 'pastas' ? 'Pastas' : 'Laudos']}
+                    contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px' }}
                   />
-                  <Bar dataKey="estudos" fill="#2563eb" radius={[0, 4, 4, 0]} name="Estudos" />
-                  <Bar dataKey="laudos" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Laudos" />
-                  <Bar dataKey="pastas" fill="#94a3b8" radius={[0, 4, 4, 0]} name="Pastas" />
+                  <Bar dataKey="estudos" fill="#2563eb" radius={[0, 2, 2, 0]} barSize={10} />
+                  <Bar dataKey="laudos" fill="#f59e0b" radius={[0, 2, 2, 0]} barSize={6} />
+                  <Bar dataKey="pastas" fill="#cbd5e1" radius={[0, 2, 2, 0]} barSize={6} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+            {/* Column 2: Second Half */}
+            <div className="h-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={chartData.slice(Math.ceil(chartData.length / 2))}
+                  margin={{ top: 0, right: 30, left: 80, bottom: 0 }}
+                >
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    fontSize={9}
+                    stroke="#94a3b8"
+                    width={75}
+                    tick={{ fontWeight: 'bold' }}
+                    interval={0}
+                    tickFormatter={(val) => val.length > 15 ? val.substring(0, 12) + '...' : val}
+                  />
+                  <Tooltip
+                    formatter={(v: any, n: any) => [v.toLocaleString(), n === 'estudos' ? 'Estudos' : n === 'pastas' ? 'Pastas' : 'Laudos']}
+                    contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px' }}
+                  />
+                  <Bar dataKey="estudos" fill="#2563eb" radius={[0, 2, 2, 0]} barSize={10} />
+                  <Bar dataKey="laudos" fill="#f59e0b" radius={[0, 2, 2, 0]} barSize={6} />
+                  <Bar dataKey="pastas" fill="#cbd5e1" radius={[0, 2, 2, 0]} barSize={6} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-center gap-6 border-t border-slate-50 pt-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-600 rounded-sm" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Estudos</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-amber-500 rounded-sm" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Laudos</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-slate-300 rounded-sm" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Pastas</span>
             </div>
           </div>
         </div>
@@ -185,6 +185,141 @@ export default function Overview({
                 <span className="text-[10px] font-bold text-slate-600">{s.name}: {s.value}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Second Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 min-h-[500px] flex flex-col">
+          <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight mb-6 flex items-center gap-2">
+            <Database className="w-4 h-4 text-indigo-600" />
+            Eficiência de Storage Global (Mapeado vs Enviado)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1 overflow-hidden">
+            {/* Column 1: First Half */}
+            <div className="h-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={chartData.slice(0, Math.ceil(chartData.length / 2))}
+                  margin={{ top: 0, right: 30, left: 80, bottom: 0 }}
+                >
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    fontSize={9}
+                    stroke="#94a3b8"
+                    width={75}
+                    tick={{ fontWeight: 'bold' }}
+                    interval={0}
+                    tickFormatter={(val) => val.length > 15 ? val.substring(0, 12) + '...' : val}
+                  />
+                  <Tooltip
+                    formatter={(v: any, n: any) => [`${(Number(v) || 0).toFixed(1)} TB`, n === 'volume' ? 'Mapeado' : 'Enviado']}
+                    contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px' }}
+                  />
+                  <Bar dataKey="volume" fill="#e2e8f0" radius={[0, 2, 2, 0]} barSize={10} />
+                  <Bar dataKey="enviado" fill="#10b981" radius={[0, 2, 2, 0]} barSize={10} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Column 2: Second Half */}
+            <div className="h-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={chartData.slice(Math.ceil(chartData.length / 2))}
+                  margin={{ top: 0, right: 30, left: 80, bottom: 0 }}
+                >
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    fontSize={9}
+                    stroke="#94a3b8"
+                    width={75}
+                    tick={{ fontWeight: 'bold' }}
+                    interval={0}
+                    tickFormatter={(val) => val.length > 15 ? val.substring(0, 12) + '...' : val}
+                  />
+                  <Tooltip
+                    formatter={(v: any, n: any) => [`${(Number(v) || 0).toFixed(1)} TB`, n === 'volume' ? 'Mapeado' : 'Enviado']}
+                    contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px' }}
+                  />
+                  <Bar dataKey="volume" fill="#e2e8f0" radius={[0, 2, 2, 0]} barSize={10} />
+                  <Bar dataKey="enviado" fill="#10b981" radius={[0, 2, 2, 0]} barSize={10} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-center gap-6 border-t border-slate-50 pt-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-slate-200 rounded-sm" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Mapeado</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-emerald-500 rounded-sm" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Enviado</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-[350px] flex flex-col">
+          <h3 className="text-sm font-black text-slate-700 uppercase tracking-tight mb-6 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600" />
+            Severidade de Incidências
+          </h3>
+          <div className="flex-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Urgente', value: migrations.reduce((acc, m) => acc + getAllDisks(m).filter((d: any) => d.comment?.severity === 'urgente').length, 0), color: '#e11d48' },
+                    { name: 'Alta', value: migrations.reduce((acc, m) => acc + getAllDisks(m).filter((d: any) => d.comment?.severity === 'alta').length, 0), color: '#f43f5e' },
+                    { name: 'Média', value: migrations.reduce((acc, m) => acc + getAllDisks(m).filter((d: any) => d.comment?.severity === 'media').length, 0), color: '#f59e0b' },
+                    { name: 'Baixa', value: migrations.reduce((acc, m) => acc + getAllDisks(m).filter((d: any) => d.comment?.severity === 'baixa').length, 0), color: '#3b82f6' },
+                  ].filter(d => d.value > 0)}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={70}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {[
+                    { color: '#e11d48' },
+                    { color: '#f43f5e' },
+                    { color: '#f59e0b' },
+                    { color: '#3b82f6' }
+                  ].map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-4 space-y-1">
+            {[
+              { name: 'Urgente', color: '#e11d48' },
+              { name: 'Alta', color: '#f43f5e' },
+              { name: 'Média', color: '#f59e0b' },
+              { name: 'Baixa', color: '#3b82f6' },
+            ].map((s, i) => {
+              const count = migrations.reduce((acc, m) => acc + getAllDisks(m).filter((d: any) => d.comment?.severity === s.name.toLowerCase()).length, 0);
+              if (count === 0) return null;
+              return (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                    <span className="text-[10px] font-bold text-slate-600">{s.name}</span>
+                  </div>
+                  <span className="text-[10px] font-black text-slate-900">{count}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

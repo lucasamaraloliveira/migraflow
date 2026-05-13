@@ -189,7 +189,9 @@ export default function MigrationModal({ isOpen, onClose, clients, onAdd, isGues
               onChange={e => setFormData({ ...formData, clientId: e.target.value })}
             >
               <option value="">Selecione um cliente...</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.company})</option>)}
+              {clients
+                .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+                .map(c => <option key={c.id} value={c.id}>{c.name} ({c.company})</option>)}
             </select>
           </div>
 

@@ -435,19 +435,24 @@ function DashboardContent() {
     const allDisks = getAllDisks(m);
     const allLaudos = (m.groups || []).flatMap((g: any) => g.laudos || []);
     
-    const studies = m.isIncremental ? Math.max(0, ...allDisks.map((d: any) => Number(d.estudos) || 0)) : allDisks.reduce((sum: number, d: any) => sum + (Number(d.estudos) || 0), 0);
-    const folders = m.isIncremental ? Math.max(0, ...allDisks.map((d: any) => Math.max(Number(d.totalPastas) || 0, Number(d.pastasRealizadas) || 0))) : allDisks.reduce((sum: number, d: any) => sum + Math.max(Number(d.totalPastas) || 0, Number(d.pastasRealizadas) || 0), 0);
-    const laudos = allLaudos.reduce((sum: number, l: any) => sum + (Number(l.total) || 0), 0);
+    const studies = m.isIncremental ? Math.max(0, ...allDisks.map((d: any) => parseNum(d.estudos))) : allDisks.reduce((sum: number, d: any) => sum + parseNum(d.estudos), 0);
+    const folders = m.isIncremental ? Math.max(0, ...allDisks.map((d: any) => Math.max(parseNum(d.totalPastas), parseNum(d.pastasRealizadas)))) : allDisks.reduce((sum: number, d: any) => sum + Math.max(parseNum(d.totalPastas), parseNum(d.pastasRealizadas)), 0);
+    const storageMapeado = m.isIncremental ? Math.max(0, ...allDisks.map((d: any) => parseNum(d.storageMapeado))) : allDisks.reduce((sum: number, d: any) => sum + parseNum(d.storageMapeado), 0);
+    const storageEnviado = m.isIncremental ? Math.max(0, ...allDisks.map((d: any) => parseNum(d.storageEnviado))) : allDisks.reduce((sum: number, d: any) => sum + parseNum(d.storageEnviado), 0);
+    const laudos = allLaudos.reduce((sum: number, l: any) => sum + parseNum(l.total), 0);
     
-    if (!acc[clientName]) acc[clientName] = { name: clientName, estudos: 0, pastas: 0, volume: 0, laudos: 0 };
+    if (!acc[clientName]) acc[clientName] = { name: clientName, estudos: 0, pastas: 0, volume: 0, enviado: 0, laudos: 0 };
     acc[clientName].estudos += studies;
     acc[clientName].pastas += folders;
-    acc[clientName].volume += allDisks.reduce((sum: number, d: any) => sum + (Number(d.storageMapeado) || 0), 0);
+    acc[clientName].volume += storageMapeado;
+    acc[clientName].enviado += storageEnviado;
     acc[clientName].laudos += laudos;
     return acc;
   }, {});
 
-  const chartData = Object.values(aggregatedData);
+  const chartData = Object.values(aggregatedData).sort((a: any, b: any) => 
+    a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+  );
   const statusData = [
     { name: 'Pendente', value: migrations.filter(m => m.status === 'pendente').length, color: '#94a3b8' },
     { name: 'Execução', value: migrations.filter(m => m.status === 'em_progresso').length, color: '#2563eb' },
