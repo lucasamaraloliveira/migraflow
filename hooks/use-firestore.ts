@@ -32,8 +32,19 @@ interface FirestoreErrorInfo {
 
 const sanitizeForFirestore = (data: any): any => {
   if (data === undefined) return null;
-  if (data === null || typeof data !== 'object' || 
-      (data.constructor && (data.constructor.name === 'Timestamp' || data.constructor.name === 'FieldValue'))) return data;
+  if (data === null || typeof data !== 'object') return data;
+  
+  // Check for Firestore specific types using constructor names or properties
+  if (data.constructor && (
+    data.constructor.name === 'Timestamp' || 
+    data.constructor.name === 'FieldValue' ||
+    data.constructor.name === 'GeoPoint'
+  )) return data;
+
+  // Fallback for some environments where constructor names are unreliable
+  if (data._methodName && (data._methodName === 'serverTimestamp' || data._methodName === 'arrayUnion' || data._methodName === 'arrayRemove')) {
+    return data;
+  }
   
   if (Array.isArray(data)) {
     return data.map(sanitizeForFirestore);
@@ -139,10 +150,11 @@ export function useClients() {
 
   const addClient = async (client: Omit<Client, 'id' | 'createdAt'>) => {
     try {
-      await addDoc(collection(db, 'clients'), sanitizeForFirestore({
-        ...client,
+      const sanitizedData = sanitizeForFirestore(client);
+      await addDoc(collection(db, 'clients'), {
+        ...sanitizedData,
         createdAt: serverTimestamp()
-      }));
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'clients');
     }
@@ -164,7 +176,38 @@ export function useClients() {
     }
   };
 
-  return { clients, loading, addClient, deleteClient, updateClient };
+  /**
+   * Função de reparo para clientes que ficaram sem data de cadastro
+   * devido a bugs anteriores ou importações incompletas.
+   */
+  const repairClientDates = async () => {
+    const clientsToFix = clients.filter(c => {
+      // Se não existe o campo
+      if (!c.createdAt) return true;
+      // Se existe mas é um objeto vazio ou sem as propriedades do Firestore
+      if (typeof c.createdAt === 'object' && c.createdAt !== null && !('seconds' in c.createdAt) && !(c.createdAt instanceof Date)) return true;
+      return false;
+    });
+    
+    if (clientsToFix.length === 0) return 0;
+
+    let fixedCount = 0;
+    for (const client of clientsToFix) {
+      if (client.id) {
+        try {
+          await updateDoc(doc(db, 'clients', client.id), {
+            createdAt: serverTimestamp()
+          });
+          fixedCount++;
+        } catch (e) {
+          console.error(`Erro ao reparar cliente ${client.id}:`, e);
+        }
+      }
+    }
+    return fixedCount;
+  };
+
+  return { clients, loading, addClient, deleteClient, updateClient, repairClientDates };
 }
 
 export function useMigrations() {
@@ -183,28 +226,13 @@ export function useMigrations() {
     return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    const q = query(collection(db, 'migrations'), orderBy('updatedAt', 'desc'));
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const migrationsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Migration[];
-        setMigrations(migrationsData);
-        setLoading(false);
-      },
-      (error) => handleFirestoreError(error, OperationType.LIST, 'migrations')
-    );
-    return unsubscribe;
-  }, []);
-
   const addMigration = async (migration: Omit<Migration, 'id' | 'updatedAt'>) => {
     try {
-      await addDoc(collection(db, 'migrations'), sanitizeForFirestore({
-        ...migration,
+      const sanitizedData = sanitizeForFirestore(migration);
+      await addDoc(collection(db, 'migrations'), {
+        ...sanitizedData,
         updatedAt: serverTimestamp()
-      }));
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'migrations');
     }
@@ -212,10 +240,11 @@ export function useMigrations() {
 
   const updateMigration = async (id: string, data: Partial<Migration>) => {
     try {
-      await updateDoc(doc(db, 'migrations', id), sanitizeForFirestore({
-        ...data,
+      const sanitizedData = sanitizeForFirestore(data);
+      await updateDoc(doc(db, 'migrations', id), {
+        ...sanitizedData,
         updatedAt: serverTimestamp()
-      }));
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `migrations/${id}`);
     }

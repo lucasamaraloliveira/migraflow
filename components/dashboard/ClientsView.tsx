@@ -9,9 +9,11 @@ import {
   Copy,
   ChevronUp,
   ChevronDown,
-  ArrowUpDown
+  ArrowUpDown,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatFirestoreDate } from '@/lib/utils';
 
 interface ClientsViewProps {
   clients: any[];
@@ -19,6 +21,7 @@ interface ClientsViewProps {
   setClientToEdit: (client: any) => void;
   setIsClientModalOpen: (isOpen: boolean) => void;
   triggerDelete: (type: 'client' | 'migration', id: string, label: string) => void;
+  repairClientDates?: () => Promise<number>;
 }
 
 export default function ClientsView({
@@ -26,7 +29,8 @@ export default function ClientsView({
   isGuest,
   setClientToEdit,
   setIsClientModalOpen,
-  triggerDelete
+  triggerDelete,
+  repairClientDates
 }: ClientsViewProps) {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'name', direction: 'asc' });
 
@@ -43,8 +47,14 @@ export default function ClientsView({
 
         // Handle nested objects like createdAt
         if (sortConfig.key === 'createdAt') {
-          aValue = a.createdAt?.seconds || 0;
-          bValue = b.createdAt?.seconds || 0;
+          const getTime = (date: any) => {
+            if (!date) return 0;
+            if (date.seconds) return date.seconds;
+            const d = new Date(date);
+            return isNaN(d.getTime()) ? 0 : Math.floor(d.getTime() / 1000);
+          };
+          aValue = getTime(a.createdAt);
+          bValue = getTime(b.createdAt);
         }
 
         if (aValue < bValue) {
@@ -78,6 +88,30 @@ export default function ClientsView({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
+      {/* Maintenance / Repair Header */}
+      {repairClientDates && clients.some(c => !c.createdAt || (typeof c.createdAt === 'object' && !('seconds' in c.createdAt) && !(c.createdAt instanceof Date))) && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-amber-900 uppercase tracking-tight">Inconsistência de Dados Detectada</p>
+              <p className="text-[10px] text-amber-700 font-bold uppercase tracking-widest">Alguns clientes estão sem data de cadastro.</p>
+            </div>
+          </div>
+          <button 
+            onClick={async () => {
+              const count = await repairClientDates();
+              alert(`${count} registros corrigidos com sucesso!`);
+            }}
+            className="bg-amber-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all shadow-md active:scale-95"
+          >
+            Corrigir Agora
+          </button>
+        </div>
+      )}
+
       {/* Mobile Toolbar for Sorting */}
       <div className="md:hidden flex gap-2 mb-4 overflow-x-auto pb-2 custom-scrollbar">
         <button 
@@ -135,7 +169,7 @@ export default function ClientsView({
               </div>
               <div className="flex justify-between">
                 <span className="uppercase tracking-widest opacity-60">Cadastro:</span>
-                <span className="text-slate-900">{client.createdAt?.seconds ? format(new Date(client.createdAt.seconds * 1000), 'dd/MM/yyyy') : '...'}</span>
+                <span className="text-slate-900">{formatFirestoreDate(client.createdAt)}</span>
               </div>
             </div>
           </div>
@@ -224,7 +258,7 @@ export default function ClientsView({
                   <p className="text-xs font-medium text-slate-600">{client.email}</p>
                 </td>
                 <td className="px-6 py-4 text-xs font-mono text-slate-400">
-                  {client.createdAt?.seconds ? format(new Date(client.createdAt.seconds * 1000), 'dd.MM.yyyy') : '...'}
+                  {formatFirestoreDate(client.createdAt, 'dd.MM.yyyy')}
                 </td>
                 <td className="px-6 py-4 text-right pr-12">
                   {!isGuest && (

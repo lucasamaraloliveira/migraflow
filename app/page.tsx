@@ -52,7 +52,7 @@ export default function Home() {
 function DashboardContent() {
   const { user, isGuest, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'migrations' | 'reports'>('overview');
-  const { clients, addClient, deleteClient, updateClient } = useClients();
+  const { clients, addClient, deleteClient, updateClient, repairClientDates } = useClients();
   const { migrations, addMigration, updateMigration, deleteMigration } = useMigrations();
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<any | null>(null);
@@ -503,7 +503,7 @@ function DashboardContent() {
             ) : activeTab === 'overview' ? (
               <Overview key="overview" stats={statsValues} chartData={chartData} statusData={statusData} migrations={migrations} clients={clients} setActiveTab={setActiveTab} setSelectedMigrationId={setSelectedMigrationId} />
             ) : activeTab === 'clients' ? (
-              <ClientsView key="clients" clients={clients} isGuest={isGuest} setClientToEdit={setClientToEdit} setIsClientModalOpen={setIsClientModalOpen} triggerDelete={triggerDelete} />
+              <ClientsView key="clients" clients={clients} isGuest={isGuest} setClientToEdit={setClientToEdit} setIsClientModalOpen={setIsClientModalOpen} triggerDelete={triggerDelete} repairClientDates={repairClientDates} />
             ) : activeTab === 'migrations' ? (
               <MigrationsView key="migrations" migrations={migrations} clients={clients} isGuest={isGuest} sortOrder={sortOrder} setSortOrder={setSortOrder} setSelectedMigrationId={setSelectedMigrationId} updateMigration={updateMigration} triggerDelete={triggerDelete} />
             ) : activeTab === 'reports' ? (
