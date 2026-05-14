@@ -40,6 +40,7 @@ import AIChatDrawer from '@/components/dashboard/AIChatDrawer';
 import SidebarLink from '@/components/common/SidebarLink';
 import BottomNavLink from '@/components/common/BottomNavLink';
 import StatusBadge from '@/components/common/StatusBadge';
+import MigrationSummaryPrint from '@/components/migration/MigrationSummaryPrint';
 
 export default function Home() {
   return (
@@ -62,6 +63,7 @@ function DashboardContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
+  const [summaryPrintId, setSummaryPrintId] = useState<string | null>(null);
 
   // Safety Delete States
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -462,6 +464,7 @@ function DashboardContent() {
   ].filter(d => d.value > 0);
 
   const selectedMigration = migrations.find(m => m.id === selectedMigrationId);
+  const migrationForSummary = migrations.find(m => m.id === summaryPrintId);
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
@@ -504,13 +507,13 @@ function DashboardContent() {
         <div className="p-4 md:p-8">
           <AnimatePresence mode="wait">
             {selectedMigration ? (
-              <MigrationDetails key="details" migration={selectedMigration} isGuest={isGuest} onUpdate={(data) => updateMigration(selectedMigration.id!, data)} />
+              <MigrationDetails key="details" migration={selectedMigration} isGuest={isGuest} setSummaryPrintId={setSummaryPrintId} onUpdate={(data) => updateMigration(selectedMigration.id!, data)} />
             ) : activeTab === 'overview' ? (
               <Overview key="overview" stats={statsValues} chartData={chartData} statusData={statusData} migrations={migrations} clients={clients} setActiveTab={setActiveTab} setSelectedMigrationId={setSelectedMigrationId} />
             ) : activeTab === 'clients' ? (
               <ClientsView key="clients" clients={clients} isGuest={isGuest} setClientToEdit={setClientToEdit} setIsClientModalOpen={setIsClientModalOpen} triggerDelete={triggerDelete} repairClientDates={repairClientDates} />
             ) : activeTab === 'migrations' ? (
-              <MigrationsView key="migrations" migrations={migrations} clients={clients} isGuest={isGuest} sortOrder={sortOrder} setSortOrder={setSortOrder} setSelectedMigrationId={setSelectedMigrationId} updateMigration={updateMigration} triggerDelete={triggerDelete} />
+              <MigrationsView key="migrations" migrations={migrations} clients={clients} isGuest={isGuest} sortOrder={sortOrder} setSortOrder={setSortOrder} setSelectedMigrationId={setSelectedMigrationId} setSummaryPrintId={setSummaryPrintId} updateMigration={updateMigration} triggerDelete={triggerDelete} />
             ) : activeTab === 'reports' ? (
               <ReportsView key="reports" migrations={migrations} onGenerateIncidencesReport={generateIncidencesReport} onGenerateHandoffReport={generateHandoffReport} onGenerateExecutiveReport={generateExecutiveReport} onGenerateInventoryReport={generateInventoryReport} onGenerateLaudosReport={generateLaudosReport} onGenerateStorageReport={generateInventoryReport} onGenerateDensityReport={generateDensityReport} />
             ) : null}
@@ -537,6 +540,13 @@ function DashboardContent() {
         {undoToast.show && <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-[100] border border-slate-800"><p className="text-xs font-black uppercase">{undoToast.label} removido</p><button onClick={handleUndo} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Desfazer</button></motion.div>}
         {deleteConfirm.isOpen && <div className="fixed inset-0 z-[110] flex items-center justify-center p-4"><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteConfirm({ ...deleteConfirm, isOpen: false })} className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" /><motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="relative w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-2xl"><div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-6"><Trash2 className="w-8 h-8 text-rose-600" /></div><h2 className="text-xl font-black uppercase mb-2">Excluir {deleteConfirm.type === 'client' ? 'Cliente' : 'Migração'}?</h2><p className="text-sm text-slate-500 mb-6 font-medium">Remover {deleteConfirm.label} definitivamente?</p><div className="flex gap-3"><button onClick={() => setDeleteConfirm({ ...deleteConfirm, isOpen: false })} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-2xl font-black uppercase text-xs">Cancelar</button><button onClick={executeConfirmDelete} className="flex-1 bg-rose-600 text-white py-3 rounded-2xl font-black uppercase text-xs shadow-lg">Confirmar</button></div></motion.div></div>}
         {integrityModal.isOpen && <div className="fixed inset-0 z-[120] flex items-center justify-center p-4"><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => setIntegrityModal({ ...integrityModal, isOpen: false })} className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" /><motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="relative w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-2xl"><div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-6"><AlertCircle className="w-8 h-8 text-amber-600" /></div><h2 className="text-xl font-black uppercase mb-2">Bloqueio Crítico</h2><p className="text-sm text-slate-500 mb-6 font-medium">Não é possível excluir {integrityModal.label} com projetos ativos.</p><button onClick={() => setIntegrityModal({ ...integrityModal, isOpen: false })} className="w-full bg-slate-900 text-white py-3 rounded-2xl font-black uppercase text-xs">Entendido</button></motion.div></div>}
+        {migrationForSummary && (
+          <MigrationSummaryPrint 
+            migration={migrationForSummary} 
+            clientName={getClientName(migrationForSummary, clients)}
+            onClose={() => setSummaryPrintId(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

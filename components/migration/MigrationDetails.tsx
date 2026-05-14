@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
 import {
   Trash2,
   FileUp,
@@ -14,7 +14,11 @@ import {
   Check,
   Copy,
   ChevronLeft,
-  AlertCircle
+  AlertCircle,
+  LayoutDashboard,
+  GripVertical,
+  Link as LinkIcon,
+  Link2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -38,9 +42,10 @@ interface MigrationDetailsProps {
   migration: any;
   onUpdate: (data: any) => Promise<void>;
   isGuest: boolean;
+  setSummaryPrintId: (id: string | null) => void;
 }
 
-export default function MigrationDetails({ migration, onUpdate, isGuest }: MigrationDetailsProps) {
+export default function MigrationDetails({ migration, onUpdate, isGuest, setSummaryPrintId }: MigrationDetailsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedGroups, setEditedGroups] = useState<DiskGroup[]>(
     migration.groups || (migration.disks?.length > 0 ? [{ id: 'default', title: 'Unidade Principal', disks: migration.disks }] : [{ id: 'default', title: 'Unidade Principal', disks: [] }])
@@ -119,44 +124,78 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
   };
 
   const getGroupSummary = (group: DiskGroup) => {
-    const groupDisks = group.disks;
-    const groupLaudos = group.laudos || [];
-    const isIncremental = migration.isIncremental;
+    const getBaseData = (g: DiskGroup) => {
+      const gDisks = g.disks;
+      const gLaudos = g.laudos || [];
+      const isIncremental = migration.isIncremental;
 
-    const totalPastas = isIncremental
-      ? Math.max(0, ...groupDisks.map(d => parseNum(d.totalPastas)))
-      : groupDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0);
-    const pastasRealizadas = isIncremental
-      ? Math.max(0, ...groupDisks.map(d => Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas))))
-      : groupDisks.reduce((acc, d) => {
-        const total = parseNum(d.totalPastas);
-        const realized = parseNum(d.pastasRealizadas);
-        return acc + Math.min(realized, total);
-      }, 0);
-    const estudosEnviados = isIncremental
-      ? Math.max(0, ...groupDisks.map(d => parseNum(d.estudos)))
-      : groupDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0);
-    const storageMapeado = isIncremental
-      ? Math.max(0, ...groupDisks.map(d => parseNum(d.storageMapeado)))
-      : groupDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0);
-    const storageEnviado = isIncremental
-      ? Math.max(0, ...groupDisks.map(d => parseNum(d.storageEnviado)))
-      : groupDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0);
-    const progresso = totalPastas > 0 ? Number(((pastasRealizadas / totalPastas) * 100).toFixed(2)) : 0;
+      const totalPastas = isIncremental
+        ? Math.max(0, ...gDisks.map(d => parseNum(d.totalPastas)))
+        : gDisks.reduce((acc, d) => acc + parseNum(d.totalPastas), 0);
+      const pastasRealizadas = isIncremental
+        ? Math.max(0, ...gDisks.map(d => Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas))))
+        : gDisks.reduce((acc, d) => acc + Math.min(parseNum(d.pastasRealizadas), parseNum(d.totalPastas)), 0);
+      const estudosEnviados = isIncremental
+        ? Math.max(0, ...gDisks.map(d => parseNum(d.estudos)))
+        : gDisks.reduce((acc, d) => acc + parseNum(d.estudos), 0);
+      const storageMapeado = isIncremental
+        ? Math.max(0, ...gDisks.map(d => parseNum(d.storageMapeado)))
+        : gDisks.reduce((acc, d) => acc + parseNum(d.storageMapeado), 0);
+      const storageEnviado = isIncremental
+        ? Math.max(0, ...gDisks.map(d => parseNum(d.storageEnviado)))
+        : gDisks.reduce((acc, d) => acc + parseNum(d.storageEnviado), 0);
+      const totalLaudos = gLaudos.reduce((acc, l) => acc + parseNum(l.total), 0);
+      const laudosRealizados = gLaudos.reduce((acc, l) => acc + parseNum(l.realizados), 0);
 
-    const totalLaudos = groupLaudos.reduce((acc, l) => acc + parseNum(l.total), 0);
-    const laudosRealizados = groupLaudos.reduce((acc, l) => acc + parseNum(l.realizados), 0);
-    const progressoLaudos = totalLaudos > 0 ? Number(((laudosRealizados / totalLaudos) * 100).toFixed(2)) : 0;
+      return { totalPastas, pastasRealizadas, estudosEnviados, storageMapeado, storageEnviado, totalLaudos, laudosRealizados };
+    };
+
+    // Find the root group (if this is a child, find its target. if it's a target, it's itself)
+    const rootGroupId = group.linkedGroupId || group.id;
+    
+    // Family = root + all groups that link to this root
+    const family = editedGroups.filter(g => g.id === rootGroupId || g.linkedGroupId === rootGroupId);
+    
+    let groupSummaryData = {
+      totalPastas: 0,
+      pastasRealizadas: 0,
+      estudosEnviados: 0,
+      storageMapeado: 0,
+      storageEnviado: 0,
+      totalLaudos: 0,
+      laudosRealizados: 0
+    };
+
+    family.forEach(member => {
+      const data = getBaseData(member);
+      groupSummaryData.totalPastas += data.totalPastas;
+      groupSummaryData.pastasRealizadas += data.pastasRealizadas;
+      groupSummaryData.estudosEnviados += data.estudosEnviados;
+      groupSummaryData.storageMapeado += data.storageMapeado;
+      groupSummaryData.storageEnviado += data.storageEnviado;
+      groupSummaryData.totalLaudos += data.totalLaudos;
+      groupSummaryData.laudosRealizados += data.laudosRealizados;
+    });
+
+    const progresso = groupSummaryData.totalPastas > 0 ? Number(((groupSummaryData.pastasRealizadas / groupSummaryData.totalPastas) * 100).toFixed(2)) : 0;
+    const progressoLaudos = groupSummaryData.totalLaudos > 0 ? Number(((groupSummaryData.laudosRealizados / groupSummaryData.totalLaudos) * 100).toFixed(2)) : 0;
 
     return { 
-      totalPastas, pastasRealizadas, estudosEnviados, storageMapeado, storageEnviado, progresso,
-      totalLaudos, laudosRealizados, progressoLaudos 
+      ...groupSummaryData,
+      progresso,
+      progressoLaudos 
     };
   };
 
   const addGroup = () => {
     if (isGuest) return;
     setEditedGroups([...editedGroups, { id: crypto.randomUUID(), title: 'Nova Unidade', disks: [] }]);
+    setIsEditing(true);
+  };
+
+  const handleReorder = (newOrder: DiskGroup[]) => {
+    if (isGuest) return;
+    setEditedGroups(newOrder);
     setIsEditing(true);
   };
 
@@ -589,12 +628,23 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
             {isEditing && (
               <button onClick={handleSave} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all">Salvar</button>
             )}
+            <button 
+              onClick={() => setSummaryPrintId(migration.id)} 
+              className="bg-white border border-slate-700 text-slate-300 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" /> Resumo Visual
+            </button>
             <button onClick={generateAISummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all">IA Insight</button>
           </div>
         </div>
         <div className="p-6 space-y-6">
           {allDisks.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pastas</p>
+                <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.totalPastas.toLocaleString()}</h4>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{summary.pastasRealizadas.toLocaleString()} Realizadas</p>
+              </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Estudos</p>
                 <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{summary.estudosEnviados.toLocaleString()}</h4>
@@ -649,13 +699,28 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
         </div>
       </div>
 
-      <div className="space-y-12">
+      <Reorder.Group 
+        axis="y" 
+        values={editedGroups} 
+        onReorder={handleReorder}
+        className="space-y-12"
+      >
         {editedGroups.map((group) => {
           const groupSummary = getGroupSummary(group);
           return (
-            <div key={group.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <Reorder.Item 
+              key={group.id} 
+              value={group}
+              className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+              dragListener={!isGuest}
+            >
               <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 w-full">
+                  {!isGuest && (
+                    <div className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-slate-300 hover:text-slate-500 transition-colors">
+                      <GripVertical className="w-5 h-5" />
+                    </div>
+                  )}
                   <div className="flex flex-col flex-1 min-w-0">
                     <input
                       type="text"
@@ -670,6 +735,30 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
 
                 {!isGuest && (
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Link Group Option */}
+                    <div className="flex items-center gap-2 mr-2">
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg">
+                        <Link2 className="w-3 h-3 text-slate-400" />
+                        <select
+                          className="bg-transparent text-[9px] font-black uppercase tracking-widest outline-none text-slate-600 cursor-pointer min-w-[100px]"
+                          value={group.linkedGroupId || ''}
+                          onChange={(e) => {
+                            const val = e.target.value || undefined;
+                            setEditedGroups(editedGroups.map(g => g.id === group.id ? { ...g, linkedGroupId: val } : g));
+                            setIsEditing(true);
+                          }}
+                        >
+                          <option value="">Independente</option>
+                          {editedGroups
+                            .filter(g => g.id !== group.id)
+                            .map(g => (
+                              <option key={g.id} value={g.id}>Unificar com {g.title}</option>
+                            ))
+                          }
+                        </select>
+                      </div>
+                    </div>
+
                     <label className="whitespace-nowrap text-[9px] bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95">
                       <FileUp className="w-3 h-3" /> Importar
                       <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={e => handleFileUpload(e, group.id)} />
@@ -716,7 +805,12 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
               {(group.disks.length > 0 || (group.laudos && group.laudos.length > 0)) && (
                 <div className="bg-slate-50/50 p-4 border-b border-slate-100 space-y-4">
                   {group.disks.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Pastas da Unidade</p>
+                        <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.totalPastas.toLocaleString()}</p>
+                        <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">{groupSummary.pastasRealizadas.toLocaleString()} Realizadas</p>
+                      </div>
                       <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudos da Unidade</p>
                         <p className="text-lg font-black text-slate-900 tracking-tighter">{groupSummary.estudosEnviados.toLocaleString()}</p>
@@ -1078,6 +1172,23 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                         );
                       })}
                     </tbody>
+                    <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                      <tr className="text-xs font-black uppercase tracking-widest text-slate-900">
+                        <td className="p-4 pl-6">Totais da Unidade</td>
+                        <td className="p-4 text-center">-</td>
+                        <td className="p-4 text-center text-blue-600 bg-blue-50/50">{groupSummary.pastasRealizadas.toLocaleString()}</td>
+                        <td className="p-4 text-center">{groupSummary.estudosEnviados.toLocaleString()}</td>
+                        <td className="p-4 text-center">-</td>
+                        <td className="p-4 text-center text-slate-500">{groupSummary.totalPastas.toLocaleString()}</td>
+                        <td className="p-4 text-center text-slate-500">{groupSummary.storageMapeado.toFixed(1)} TB</td>
+                        <td className="p-4 text-center text-emerald-600 bg-emerald-50/50">{groupSummary.storageEnviado.toFixed(1)} TB</td>
+                        <td className="p-4 pr-6 text-right">
+                          <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px]">
+                            {groupSummary.progresso}%
+                          </span>
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               )}
@@ -1226,7 +1337,7 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
                   </button>
                 </div>
               )}
-            </div>
+            </Reorder.Item>
           );
         })}
 
@@ -1241,7 +1352,7 @@ export default function MigrationDetails({ migration, onUpdate, isGuest }: Migra
             <span className="text-xs font-black uppercase tracking-widest">Adicionar Nova Unidade / Grupo de Discos</span>
           </button>
         )}
-      </div>
+      </Reorder.Group>
 
       {/* Detail Chart */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-[450px] flex flex-col">

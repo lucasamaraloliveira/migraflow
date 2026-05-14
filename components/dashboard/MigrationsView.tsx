@@ -7,7 +7,8 @@ import {
   FileText,
   ChevronUp, 
   ChevronDown, 
-  ArrowUpDown 
+  ArrowUpDown,
+  LayoutDashboard
 } from 'lucide-react';
 import StatusBadge from '@/components/common/StatusBadge';
 import { getClientName, getAllDisks, parseNum } from '@/lib/utils';
@@ -19,6 +20,7 @@ interface MigrationsViewProps {
   sortOrder: 'asc' | 'desc' | 'none';
   setSortOrder: React.Dispatch<React.SetStateAction<'asc' | 'desc' | 'none'>>;
   setSelectedMigrationId: (id: string | null) => void;
+  setSummaryPrintId: (id: string | null) => void;
   updateMigration: (id: string, data: any) => Promise<void>;
   triggerDelete: (type: 'client' | 'migration', id: string, label: string) => void;
 }
@@ -30,6 +32,7 @@ export default function MigrationsView({
   sortOrder: _sortOrder,
   setSortOrder: _setSortOrder,
   setSelectedMigrationId,
+  setSummaryPrintId,
   updateMigration,
   triggerDelete
 }: MigrationsViewProps) {
@@ -233,7 +236,7 @@ export default function MigrationsView({
           <thead>
             <tr className="bg-slate-900 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800">
               <th 
-                className="px-6 py-4 w-[25%] cursor-pointer hover:text-white transition-colors group"
+                className="px-6 py-4 w-[18%] cursor-pointer hover:text-white transition-colors group"
                 onClick={() => requestSort('clientName')}
               >
                 <div className="flex items-center gap-2">
@@ -241,9 +244,9 @@ export default function MigrationsView({
                   {getSortIcon('clientName')}
                 </div>
               </th>
-              <th className="px-6 py-4 w-[20%]">Escopo</th>
+              <th className="px-6 py-4 w-[12%]">Escopo</th>
               <th 
-                className="px-6 py-4 text-center w-[20%] cursor-pointer hover:text-white transition-colors group"
+                className="px-6 py-4 text-center w-[18%] cursor-pointer hover:text-white transition-colors group"
                 onClick={() => requestSort('progress')}
               >
                 <div className="flex items-center justify-center gap-2">
@@ -251,7 +254,7 @@ export default function MigrationsView({
                 </div>
               </th>
               <th 
-                className="px-6 py-4 text-center w-[20%] cursor-pointer hover:text-white transition-colors group"
+                className="px-6 py-4 text-center w-[12%] cursor-pointer hover:text-white transition-colors group"
                 onClick={() => requestSort('status')}
               >
                 <div className="flex items-center justify-center gap-2">
@@ -259,14 +262,14 @@ export default function MigrationsView({
                 </div>
               </th>
               <th 
-                className="px-6 py-4 w-[12%] text-center cursor-pointer hover:text-white transition-colors group"
+                className="px-6 py-4 w-[10%] text-center cursor-pointer hover:text-white transition-colors group"
                 onClick={() => requestSort('endDate')}
               >
                 <div className="flex items-center justify-center gap-2">
                   Data {getSortIcon('endDate')}
                 </div>
               </th>
-              <th className="px-6 py-4 text-right pr-6 w-[8%]"></th>
+              <th className="px-6 py-4 text-right pr-6 w-[30%]"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -368,9 +371,16 @@ export default function MigrationsView({
                   <div className="flex items-center justify-end gap-3">
                     <button
                       onClick={() => setSelectedMigrationId(m.id!)}
-                      className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md scale-95 hover:scale-100"
+                      className="flex items-center gap-2 bg-slate-900 text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md scale-95 hover:scale-100 whitespace-nowrap shrink-0"
                     >
-                      <HardDrive className="w-3.5 h-3.5" /> Analisar Discos
+                      <HardDrive className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Analisar</span> Discos
+                    </button>
+                    <button
+                      onClick={() => setSummaryPrintId(m.id!)}
+                      className="flex items-center gap-2 bg-white border border-slate-200 text-slate-900 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm scale-95 hover:scale-100 whitespace-nowrap shrink-0"
+                      title="Gerar resumo visual para print (Jira)"
+                    >
+                      <LayoutDashboard className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Resumo</span> Visual
                     </button>
                     {!isGuest && (
                       <button

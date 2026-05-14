@@ -114,6 +114,7 @@ export interface DiskGroup {
   title: string;
   disks: Disk[];
   laudos?: Laudo[];
+  linkedGroupId?: string;
 }
 
 export interface Migration {
